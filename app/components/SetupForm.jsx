@@ -7,7 +7,7 @@ const MUTED = "var(--muted)";
 const RELEASES_URL = "https://github.com/GunzRuls/canvas-dashboard/releases/latest";
 
 // Saved tokens and keys are never sent to this page. For those, a blank box means "keep it".
-export default function SetupForm({ saved, firstRun, installed, version }) {
+export default function SetupForm({ saved, firstRun, installed, version, fixToken }) {
   const [canvasBaseUrl, setCanvasBaseUrl] = useState(saved.canvasBaseUrl);
   const [canvasToken, setCanvasToken] = useState("");
   const [calendarUrls, setCalendarUrls] = useState("");
@@ -70,13 +70,33 @@ export default function SetupForm({ saved, firstRun, installed, version }) {
   }
 
   return (
-    <main className="mx-auto max-w-xl px-4 py-10">
+    <main className="mx-auto max-w-xl px-4 pb-10">
+      {/* Stays at the top while you scroll, so there's always a clear way back. */}
+      <div className="sticky top-0 z-10 -mx-4 mb-4 px-4 pb-3 pt-4" style={{ background: "var(--bg)" }}>
+        {firstRun ? (
+          <div className="h-8" />
+        ) : (
+          <a
+            href="/"
+            className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-bold transition-opacity hover:opacity-80"
+            style={{ background: "var(--surface)", color: INK }}
+          >
+            <span aria-hidden="true">←</span> Back to dashboard
+          </a>
+        )}
+      </div>
       <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: INK }}>
         {firstRun ? "Welcome! Let's connect Canvas" : "Settings"}
       </h1>
       <p className="mt-2 text-sm" style={{ color: MUTED }}>
         Everything you enter is saved only on this computer. Your token is only ever sent to Canvas.
       </p>
+      {fixToken && (
+        <p className="mt-4 rounded-xl px-4 py-3 text-sm font-semibold" style={{ background: "var(--amber-bg)", color: "var(--amber-fg)" }}>
+          Your Canvas token stopped working. Follow the steps under Access token to make a new one, paste it, and
+          click Save.
+        </p>
+      )}
 
       <form onSubmit={submit} className="mt-6 flex flex-col gap-4">
         <Section title="Canvas" note="Required">
@@ -104,7 +124,7 @@ export default function SetupForm({ saved, firstRun, installed, version }) {
           <Field
             label="Access token"
             help={
-              <Help note="Treat the token like a password: anyone who has it can see your Canvas. If you don't see + New Access Token, your school has turned tokens off for students, and the dashboard can't connect.">
+              <Help open={fixToken} note="Treat the token like a password: anyone who has it can see your Canvas. If you don't see + New Access Token, your school has turned tokens off for students, and the dashboard can't connect.">
                 <li>
                   {canvasSettingsUrl(canvasBaseUrl) ? (
                     <Ext href={canvasSettingsUrl(canvasBaseUrl)}>Open your Canvas settings</Ext>
@@ -132,8 +152,9 @@ export default function SetupForm({ saved, firstRun, installed, version }) {
               type="password"
               value={canvasToken}
               onChange={setCanvasToken}
-              placeholder={saved.tokenEnding ? `Saved (ends in ${saved.tokenEnding}). Leave blank to keep it.` : "Paste your token"}
-              required={!saved.tokenEnding}
+              placeholder={fixToken ? "Paste your new token" : saved.tokenEnding ? `Saved (ends in ${saved.tokenEnding}). Leave blank to keep it.` : "Paste your token"}
+              required={!saved.tokenEnding || fixToken}
+              autoFocus={fixToken}
             />
           </Field>
         </Section>
@@ -244,11 +265,6 @@ export default function SetupForm({ saved, firstRun, installed, version }) {
           >
             {saving ? "Checking with Canvas…" : firstRun ? "Connect and open dashboard" : "Save"}
           </button>
-          {!firstRun && (
-            <a href="/" className="text-sm font-bold hover:underline" style={{ color: MUTED }}>
-              Cancel
-            </a>
-          )}
         </div>
       </form>
 
@@ -388,9 +404,9 @@ function Field({ label, help, children }) {
 }
 
 // A "How do I find this?" dropdown with numbered steps.
-function Help({ children, note }) {
+function Help({ children, note, open = false }) {
   return (
-    <details className="group">
+    <details className="group" open={open}>
       <summary
         className="inline-flex cursor-pointer list-none items-center gap-1 text-xs font-bold hover:underline"
         style={{ color: "var(--blue-fg)" }}

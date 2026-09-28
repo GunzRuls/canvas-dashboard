@@ -45,6 +45,8 @@ async function checkCanvas(base, token) {
     throw new Error(`Couldn't reach ${base}. Check the Canvas address.`);
   }
   if (res.status === 401) throw new Error("Canvas didn't accept that token. Make a new one and paste it again.");
+  // Canvas answers a token that's cut off or has extra characters with a server error.
+  if (res.status === 500) throw new Error("Canvas didn't accept that token. Make sure you copied the whole thing, then paste it again.");
   if (!res.ok) throw new Error(`Canvas returned ${res.status}. Check the Canvas address.`);
   const user = await res.json().catch(() => null);
   if (!user?.id) throw new Error("That address didn't answer like Canvas. Check the Canvas address.");
