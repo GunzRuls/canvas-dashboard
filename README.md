@@ -2,35 +2,31 @@
 
 A dashboard that puts your Canvas assignments, grades, announcements, and class check-ins on one screen. It runs on your own Windows PC. Everything you enter is saved only on your computer, and your Canvas token is only ever sent to Canvas.
 
-## What you need
-
-- Windows 10 or 11
-- [Node.js](https://nodejs.org) (the LTS version)
-- Google Chrome or Microsoft Edge
-
 ## Install
 
-1. Download this repo: green **Code** button → **Download ZIP**, then unzip it somewhere you'll keep it (like your Documents folder).
-2. Double-click **Install.cmd** in the folder. It installs everything, puts a **School Dashboard** icon on your desktop, and opens the dashboard.
-3. The first time it opens, it asks for:
+You need Windows 10 or 11 and Google Chrome or Microsoft Edge. Nothing else.
+
+1. Go to the [latest release](https://github.com/GunzRuls/canvas-dashboard/releases/latest) and download **School-Dashboard-Setup.exe**.
+2. Open it and click through the installer. No administrator password is needed.
+
+   Windows may say "Windows protected your PC" because the installer isn't from a big company. Click **More info → Run anyway**.
+
+3. The first time the dashboard opens, it asks for:
    - **Your school's Canvas address**, like `yourschool.instructure.com`
    - **A Canvas access token**: in Canvas go to **Account → Settings → Approved Integrations → + New Access Token**, then copy it.
 
    Google Calendar and the morning email are optional. You can add them now or later from **Settings** on the dashboard.
 
-If Windows shows "Windows protected your PC" when you run Install.cmd, click **More info → Run anyway**.
-
 ## Using it
 
-- Open it from the **School Dashboard** icon on your desktop.
+- Open it from the **School Dashboard** icon on your desktop or in the Start menu.
 - Close the window when you're done. The dashboard stops in the background by itself shortly after.
 - Change your Canvas token, Google Calendar, or email settings from the **Settings** button.
-- If something goes wrong while starting, the details are in `launcher\server.log`.
 
-## Reinstall or uninstall
+## Update or uninstall
 
-- **Reinstall** (if something seems broken): double-click **Install.cmd** again, or use **Settings → Reinstall**. It starts fresh and keeps your settings.
-- **Uninstall:** double-click **Uninstall.cmd**, or use **Settings → Uninstall**. It removes the desktop icon and installed files, then asks whether to keep your settings or delete the whole folder.
+- **Update:** download the newest **School-Dashboard-Setup.exe** from the [latest release](https://github.com/GunzRuls/canvas-dashboard/releases/latest) and run it. Your settings are kept.
+- **Uninstall:** Windows **Settings → Apps → Installed apps → School Dashboard → Uninstall**, or **Settings → Uninstall** in the dashboard. It asks whether to keep your saved settings.
 - After uninstalling, you can also delete your token in Canvas: **Account → Settings → Approved Integrations**.
 
 ## Optional features
@@ -40,12 +36,16 @@ If Windows shows "Windows protected your PC" when you run Install.cmd, click **M
 
 ## Your data
 
-These files stay in your dashboard folder and are never uploaded:
+Your settings are saved in `%APPDATA%\School Dashboard` and are never uploaded:
 
 - `dashboard-config.json`: your Canvas address, token, and optional keys
 - `dashboard-settings.json`: class names, colors, hidden classes, class times
 - `dashboard-dismissed.json`: announcements and grades you've cleared
+- `server.log`: details if the dashboard fails to start
 
 ## For developers
 
-Next.js (App Router), plain JavaScript, Tailwind v4. Run `npm run dev` (stop the desktop version first, since both use port 3000). Settings can also come from `.env.local` (see `.env.example`). Anything saved on the setup screen takes priority.
+Next.js (App Router), plain JavaScript, Tailwind v4.
+
+- **Run from source:** install [Node.js](https://nodejs.org) (LTS), then double-click **Install.cmd** (or run `npm ci`). The desktop icon then runs this folder, rebuilding when code changes, and personal files are kept in the folder itself. **Uninstall.cmd** removes it. For development, run `npm run dev` (stop the desktop version first, since both use port 3000). Settings can also come from `.env.local` (see `.env.example`); anything saved on the setup screen takes priority.
+- **Release a new installer:** on GitHub, **Releases → Draft a new release**, create a tag like `v1.0.0`, and publish. The **Build installer** workflow builds `School-Dashboard-Setup.exe` and attaches it to the release in a few minutes. You can also run the workflow by hand from the **Actions** tab to get a test build.

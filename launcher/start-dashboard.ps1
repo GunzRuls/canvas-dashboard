@@ -1,5 +1,6 @@
 # School Dashboard launcher
 # Starts the dashboard in the background if it isn't already running, then opens it.
+# Works both for the installed app (School-Dashboard-Setup.exe) and for the project folder.
 # The server has no window. It stops by itself a little after you close the dashboard window.
 
 $Project   = Split-Path -Parent $PSScriptRoot
@@ -49,7 +50,46 @@ function Show-Splash($text) {
     return $form
 }
 
-if (-not (Test-Running)) {
+# Installed with School-Dashboard-Setup.exe: the app comes prebuilt with its own Node.js.
+$Node      = Join-Path $Project "node\node.exe"
+$ServerJs  = Join-Path $Project "app\server.js"
+$Installed = (Test-Path $Node) -and (Test-Path $ServerJs)
+
+if ($Installed -and -not (Test-Running)) {
+    # Personal files live in AppData so updating or uninstalling the app never touches them.
+    $DataDir = Join-Path $env:APPDATA "School Dashboard"
+    New-Item -ItemType Directory -Force $DataDir | Out-Null
+    $Log = Join-Path $DataDir "server.log"
+    $splash = Show-Splash "Starting the dashboard..."
+
+    $env:DASHBOARD_AUTO_STOP = "1"
+    $env:DASHBOARD_DATA_DIR = $DataDir
+    $env:DASHBOARD_INSTALL_DIR = $Project
+    $env:PORT = "$Port"
+    $env:HOSTNAME = "127.0.0.1"   # only this PC can reach the dashboard
+    # The full path to server.js lets the uninstaller find and stop this exact process.
+    $server = Start-Process -FilePath "cmd.exe" `
+        -ArgumentList "/c `"`"$Node`" `"$ServerJs`" > `"$Log`" 2>&1`"" `
+        -WorkingDirectory (Split-Path $ServerJs) `
+        -WindowStyle Hidden `
+        -PassThru
+
+    $deadline = (Get-Date).AddSeconds(60)
+    while (-not (Test-Running)) {
+        [System.Windows.Forms.Application]::DoEvents()
+        if ($server.HasExited -or (Get-Date) -gt $deadline) {
+            $splash.Close()
+            if (-not $server.HasExited) { & taskkill /PID $server.Id /T /F | Out-Null }
+            Show-Error "The dashboard didn't start. Details are in:`n$Log"
+            exit 1
+        }
+        Start-Sleep -Milliseconds 300
+    }
+    $splash.Close()
+}
+
+# Running from the project folder (Install.cmd or a git clone): build if needed, then start.
+if (-not $Installed -and -not (Test-Running)) {
     if (-not (Test-Path (Join-Path $Project "node_modules"))) {
         Show-Error "The dashboard isn't installed yet. Double-click Install.cmd in the dashboard folder first."
         exit 1

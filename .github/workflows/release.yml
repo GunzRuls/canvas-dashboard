@@ -1,0 +1,70 @@
+# Builds School-Dashboard-Setup.exe and attaches it to a GitHub release.
+# Runs when you publish a release, or by hand from the Actions tab (the .exe is then a
+# downloadable artifact on the run page instead).
+name: Build installer
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+        env:
+          BUILD_STANDALONE: "1"
+
+      - name: Make sure no personal files were packaged
+        shell: pwsh
+        run: |
+          $bad = Get-ChildItem .next/standalone -Recurse -Force -File -Include '.env*', 'dashboard-*.json', '*.log' |
+            Where-Object { $_.FullName -notmatch '\\node_modules\\' }
+          if ($bad) { $bad.FullName; throw "Personal files found in the package." }
+
+      - name: Download the Node.js runtime the app ships with
+        shell: pwsh
+        run: |
+          $version = node -p "process.version"
+          New-Item -ItemType Directory -Force dist/node | Out-Null
+          Invoke-WebRequest "https://nodejs.org/dist/$version/win-x64/node.exe" -OutFile dist/node/node.exe
+          $sums = (Invoke-WebRequest "https://nodejs.org/dist/$version/SHASUMS256.txt").Content
+          $line = ($sums -split "`n") | Where-Object { $_.Trim().EndsWith(' win-x64/node.exe') }
+          $expected = ($line.Trim() -split '\s+')[0]
+          $actual = (Get-FileHash dist/node/node.exe -Algorithm SHA256).Hash.ToLower()
+          if (-not $expected -or $actual -ne $expected) { throw "node.exe checksum didn't match." }
+          "Bundling Node.js $version"
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build the installer
+        shell: pwsh
+        run: |
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME -replace '^v', '' } else { '0.0.0-dev' }
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$version" installer/setup.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed." }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: School-Dashboard-Setup
+          path: dist/School-Dashboard-Setup.exe
+
+      - name: Attach to the release
+        if: github.event_name == 'release'
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/School-Dashboard-Setup.exe --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}

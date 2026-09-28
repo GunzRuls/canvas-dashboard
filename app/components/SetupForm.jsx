@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 
 const INK = "var(--ink)";
 const MUTED = "var(--muted)";
+const RELEASES_URL = "https://github.com/GunzRuls/canvas-dashboard/releases/latest";
 
 // Saved tokens and keys are never sent to this page. For those, a blank box means "keep it".
-export default function SetupForm({ saved, firstRun }) {
+export default function SetupForm({ saved, firstRun, installed }) {
   const [canvasBaseUrl, setCanvasBaseUrl] = useState(saved.canvasBaseUrl);
   const [canvasToken, setCanvasToken] = useState("");
   const [calendarUrls, setCalendarUrls] = useState("");
@@ -184,13 +185,13 @@ export default function SetupForm({ saved, firstRun }) {
         </div>
       </form>
 
-      {!firstRun && <Maintenance />}
+      {!firstRun && <Maintenance installed={installed} />}
     </main>
   );
 }
 
 // Reinstall and uninstall run as scripts in their own window (Install.cmd / Uninstall.cmd).
-function Maintenance() {
+function Maintenance({ installed }) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -216,22 +217,35 @@ function Maintenance() {
   return (
     <section className="mt-8 rounded-2xl p-5" style={{ background: "var(--surface)" }}>
       <span className="text-lg font-extrabold" style={{ color: INK }}>
-        Reinstall or uninstall
+        {installed ? "Update or uninstall" : "Reinstall or uninstall"}
       </span>
       <p className="mt-2 text-sm" style={{ color: MUTED }}>
-        Reinstall starts fresh if something seems broken and keeps your settings. Uninstall removes the desktop
-        icon and installed files, then asks whether to keep your settings.
+        {installed
+          ? "To update, download the latest installer and run it. Your settings are kept. Uninstall asks whether to keep your settings."
+          : "Reinstall starts fresh if something seems broken and keeps your settings. Uninstall removes the desktop icon and installed files, then asks whether to keep your settings."}
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => run("reinstall", "Reinstall the dashboard? It closes, reinstalls, and opens again. This takes a few minutes.")}
-          className="rounded-full px-4 py-1.5 text-sm font-bold disabled:opacity-60"
-          style={{ background: "var(--surface-2)", color: INK }}
-        >
-          Reinstall
-        </button>
+        {installed ? (
+          <a
+            href={RELEASES_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-full px-4 py-1.5 text-sm font-bold"
+            style={{ background: "var(--surface-2)", color: INK }}
+          >
+            Get the latest version
+          </a>
+        ) : (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => run("reinstall", "Reinstall the dashboard? It closes, reinstalls, and opens again. This takes a few minutes.")}
+            className="rounded-full px-4 py-1.5 text-sm font-bold disabled:opacity-60"
+            style={{ background: "var(--surface-2)", color: INK }}
+          >
+            Reinstall
+          </button>
+        )}
         <button
           type="button"
           disabled={busy}
