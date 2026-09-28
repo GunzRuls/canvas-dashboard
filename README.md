@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# School Dashboard for Canvas
 
-## Getting Started
+A dashboard that puts your Canvas assignments, grades, announcements, and class check-ins on one screen. It runs on your own Windows PC. Your Canvas token stays on your computer and is never sent anywhere except Canvas.
 
-First, run the development server:
+## What you need
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- Windows 10 or 11
+- [Node.js](https://nodejs.org) (the LTS version)
+- Google Chrome or Microsoft Edge
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Setup
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+1. Download this repo (green **Code** button → **Download ZIP**, then unzip it) or `git clone` it.
+2. Open PowerShell in the project folder and install the dependencies:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+   ```powershell
+   npm install
+   ```
 
-## Learn More
+   If PowerShell says running scripts is disabled, run this once and try again:
 
-To learn more about Next.js, take a look at the following resources:
+   ```powershell
+   Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+3. Make a Canvas access token: in Canvas go to **Account → Settings → Approved Integrations → + New Access Token**. Copy it.
+4. Copy `.env.example` to a new file named `.env.local` and fill in:
+   - `CANVAS_BASE_URL`: your school's Canvas address, like `https://yourschool.instructure.com`
+   - `CANVAS_TOKEN`: the token from step 3
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+   The other settings are optional. Features that need them stay hidden until you add them.
 
-## Deploy on Vercel
+5. Create the desktop icon:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File launcher\create-shortcut.ps1
+   ```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+6. Double-click **School Dashboard** on your desktop. The first start takes a minute while it builds.
+
+## Using it
+
+- Closing the dashboard window does not stop it. To stop it, close the minimized **School Dashboard** window on your taskbar.
+- After changing `.env.local`, stop it and open it again from the desktop icon.
+- Your class settings and dismissed items are saved in `dashboard-settings.json` and `dashboard-dismissed.json` in the project folder. They are personal and are not uploaded.
+
+## Optional features
+
+- **Google Calendar:** in Google Calendar settings, copy the "Secret address in iCal format" into `GOOGLE_CALENDAR_ICS_URL`. Separate several links with commas.
+- **Morning email:** add a [Resend](https://resend.com) API key as `RESEND_API_KEY` and your email as `DIGEST_TO_EMAIL`. Without your own verified domain, Resend only sends to the email you signed up with.
+
+## For developers
+
+Next.js (App Router), plain JavaScript, Tailwind v4. Run `npm run dev` for development (stop the desktop version first, since both use port 3000).

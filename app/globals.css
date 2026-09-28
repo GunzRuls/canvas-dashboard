@@ -1,26 +1,96 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
 }
 
+/* Light theme (default) */
+:root {
+  color-scheme: light;
+  --bg: #F1F0F7;
+  --surface: #FFFFFF;
+  --surface-2: #E9E8F1;
+  --surface-3: #E2E0EE;
+  --field: #F1F0F7;
+  --chip: #EEEDF4;
+  --line: #E2E0EE;
+  --ink: #1C1A2E;
+  --ink-soft: #4A4760;
+  --muted: #6B6880;
+  --inverse: #1C1A2E;
+  --inverse-fg: #FFFFFF;
+  --red-bg: #FDE2E7;    --red-fg: #B4123E;
+  --amber-bg: #FFEFC7;  --amber-fg: #8A5300;
+  --blue-bg: #E8EEFF;   --blue-fg: #1F4FB8;
+  --green-bg: #DDF5EA;  --green-fg: #0B7A55;
+  --purple-bg: #F4E8FF; --purple-fg: #7A2DB8;
+  --orange-bg: #FFE8D6; --orange-fg: #A4410B;
+}
+
+/* Dark theme: follows Windows when you haven't picked one, or when you pick Dark */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #100F1C;
+    --surface: #1B1A2C;
+    --surface-2: #161526;
+    --surface-3: #26243B;
+    --field: #24223A;
+    --chip: #2A2842;
+    --line: #2A2842;
+    --ink: #ECEAF6;
+    --ink-soft: #C4C1D6;
+    --muted: #9A97B0;
+    --inverse: #ECEAF6;
+    --inverse-fg: #100F1C;
+    --red-bg: #3D1422;    --red-fg: #FF8FA8;
+    --amber-bg: #3A2B0B;  --amber-fg: #F7C667;
+    --blue-bg: #14244A;   --blue-fg: #93B4FF;
+    --green-bg: #0E2F24;  --green-fg: #62D9AA;
+    --purple-bg: #2B1843; --purple-fg: #CDA2FF;
+    --orange-bg: #3B1F0D; --orange-fg: #FFA873;
   }
 }
 
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #100F1C;
+  --surface: #1B1A2C;
+  --surface-2: #161526;
+  --surface-3: #26243B;
+  --field: #24223A;
+  --chip: #2A2842;
+  --line: #2A2842;
+  --ink: #ECEAF6;
+  --ink-soft: #C4C1D6;
+  --muted: #9A97B0;
+  --inverse: #ECEAF6;
+  --inverse-fg: #100F1C;
+  --red-bg: #3D1422;    --red-fg: #FF8FA8;
+  --amber-bg: #3A2B0B;  --amber-fg: #F7C667;
+  --blue-bg: #14244A;   --blue-fg: #93B4FF;
+  --green-bg: #0E2F24;  --green-fg: #62D9AA;
+  --purple-bg: #2B1843; --purple-fg: #CDA2FF;
+  --orange-bg: #3B1F0D; --orange-fg: #FFA873;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+:focus-visible {
+  outline: 3px solid #2D7FF9;
+  outline-offset: 2px;
+}
+
+@keyframes live-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.live-dot { animation: live-dot 1.6s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
 }
