@@ -1,22 +1,12 @@
 import { getConfig, saveConfig, SECRET_FIELDS } from "@/lib/config";
+import { fromThisApp } from "@/lib/sameOrigin";
 
 // Saves what you enter on the setup screen. Canvas is checked before anything is saved.
 // Blank secret fields mean "keep what's saved"; names listed in `clear` are removed.
+// Only the dashboard's own page may call this: a website open in another tab could otherwise
+// point Canvas at its own server and receive your token.
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-// Only the dashboard's own page may change settings. A website open in another tab
-// could otherwise point Canvas at its own server and receive your token.
-function fromThisApp(request) {
-  const origin = request.headers.get("origin");
-  const host = request.headers.get("host");
-  if (!origin || !host) return false;
-  try {
-    return new URL(origin).host === host;
-  } catch {
-    return false;
-  }
-}
 
 function canvasAddress(input) {
   let text = String(input || "").trim();

@@ -27,6 +27,12 @@ If Windows shows "Windows protected your PC" when you run Install.cmd, click **M
 - Change your Canvas token, Google Calendar, or email settings from the **Settings** button.
 - If something goes wrong while starting, the details are in `launcher\server.log`.
 
+## Reinstall or uninstall
+
+- **Reinstall** (if something seems broken): double-click **Install.cmd** again, or use **Settings → Reinstall**. It starts fresh and keeps your settings.
+- **Uninstall:** double-click **Uninstall.cmd**, or use **Settings → Uninstall**. It removes the desktop icon and installed files, then asks whether to keep your settings or delete the whole folder.
+- After uninstalling, you can also delete your token in Canvas: **Account → Settings → Approved Integrations**.
+
 ## Optional features
 
 - **Google Calendar:** in Google Calendar settings, open a calendar and copy **Secret address in iCal format**.

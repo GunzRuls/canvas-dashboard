@@ -183,7 +183,71 @@ export default function SetupForm({ saved, firstRun }) {
           )}
         </div>
       </form>
+
+      {!firstRun && <Maintenance />}
     </main>
+  );
+}
+
+// Reinstall and uninstall run as scripts in their own window (Install.cmd / Uninstall.cmd).
+function Maintenance() {
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function run(action, question) {
+    if (!window.confirm(question)) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      const res = await fetch("/api/maintenance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Couldn't start it.");
+      setMessage("Continue in the window that just opened. You can close this one.");
+    } catch (err) {
+      setMessage(err.message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="mt-8 rounded-2xl p-5" style={{ background: "var(--surface)" }}>
+      <span className="text-lg font-extrabold" style={{ color: INK }}>
+        Reinstall or uninstall
+      </span>
+      <p className="mt-2 text-sm" style={{ color: MUTED }}>
+        Reinstall starts fresh if something seems broken and keeps your settings. Uninstall removes the desktop
+        icon and installed files, then asks whether to keep your settings.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => run("reinstall", "Reinstall the dashboard? It closes, reinstalls, and opens again. This takes a few minutes.")}
+          className="rounded-full px-4 py-1.5 text-sm font-bold disabled:opacity-60"
+          style={{ background: "var(--surface-2)", color: INK }}
+        >
+          Reinstall
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => run("uninstall", "Open the uninstaller? You'll confirm each step in its window.")}
+          className="rounded-full px-4 py-1.5 text-sm font-bold disabled:opacity-60"
+          style={{ background: "var(--red-bg)", color: "var(--red-fg)" }}
+        >
+          Uninstall…
+        </button>
+      </div>
+      {message && (
+        <p className="mt-3 text-sm font-bold" style={{ color: INK }}>
+          {message}
+        </p>
+      )}
+    </section>
   );
 }
 
