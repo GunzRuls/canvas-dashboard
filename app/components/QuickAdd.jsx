@@ -51,7 +51,7 @@ export default function QuickAdd({ courses, onAdded, onError }) {
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Add a to-do"
-        className="min-w-[180px] flex-1 rounded-lg bg-[var(--field)] px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#2D7FF9]"
+        className="min-w-[180px] flex-1 rounded-lg bg-[var(--field)] px-3 py-1.5 text-sm"
       />
       <label className="sr-only" htmlFor="quick-date">Date</label>
       <input

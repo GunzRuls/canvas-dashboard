@@ -80,7 +80,19 @@ export default function SetupForm({ saved, firstRun, installed, version }) {
 
       <form onSubmit={submit} className="mt-6 flex flex-col gap-4">
         <Section title="Canvas" note="Required">
-          <Field label="Your school's Canvas address">
+          <Field
+            label="Your school's Canvas address"
+            help={
+              <Help>
+                <li>Log in to Canvas in your browser the way you normally do.</li>
+                <li>
+                  Look at the address bar and copy the first part, before any <b>/</b>. It usually looks like{" "}
+                  <b>yourschool.instructure.com</b>. Some schools use their own, like <b>canvas.yourschool.edu</b>.
+                  Either works.
+                </li>
+              </Help>
+            }
+          >
             <Input
               value={canvasBaseUrl}
               onChange={setCanvasBaseUrl}
@@ -91,11 +103,29 @@ export default function SetupForm({ saved, firstRun, installed, version }) {
           </Field>
           <Field
             label="Access token"
-            hint={
-              <>
-                In Canvas: <b>Account → Settings → Approved Integrations → + New Access Token</b>. Copy the
-                token and paste it here.
-              </>
+            help={
+              <Help note="Treat the token like a password: anyone who has it can see your Canvas. If you don't see + New Access Token, your school has turned tokens off for students, and the dashboard can't connect.">
+                <li>
+                  {canvasSettingsUrl(canvasBaseUrl) ? (
+                    <Ext href={canvasSettingsUrl(canvasBaseUrl)}>Open your Canvas settings</Ext>
+                  ) : (
+                    <>
+                      In Canvas, click <b>Account</b> (your picture, top left), then <b>Settings</b>
+                    </>
+                  )}
+                  .
+                </li>
+                <li>
+                  Scroll down to <b>Approved Integrations</b> and click <b>+ New Access Token</b>.
+                </li>
+                <li>
+                  For <b>Purpose</b>, type &quot;School Dashboard&quot;. Leave <b>Expires</b> empty so it keeps
+                  working.
+                </li>
+                <li>
+                  Click <b>Generate Token</b> and copy the long token right away. Canvas only shows it once.
+                </li>
+              </Help>
             }
           >
             <Input
@@ -116,16 +146,34 @@ export default function SetupForm({ saved, firstRun, installed, version }) {
           onRemove={hasCalendar ? () => remove("calendarUrls") : null}
         >
           <p className="text-sm" style={{ color: MUTED }}>
-            Shows your events in the week strip and helps find class times. In Google Calendar, open a
-            calendar&apos;s settings and copy <b>Secret address in iCal format</b>. Separate several links with
-            commas.
+            Shows your events in the week strip and helps find class times.
           </p>
-          <Input
-            type="password"
-            value={calendarUrls}
-            onChange={setCalendarUrls}
-            placeholder={hasCalendar ? "Leave blank to keep your saved links" : "https://calendar.google.com/calendar/ical/…"}
-          />
+          <Field
+            label="Secret calendar link"
+            help={
+              <Help note="Keep this link private: anyone who has it can see that calendar. If it ever leaks, click Reset next to it in Google Calendar and paste the new one here. If you don't see a secret address, you may be using a school Google account that doesn't allow it; use your personal one.">
+                <li>
+                  On a computer, open <Ext href="https://calendar.google.com/calendar/r/settings">Google Calendar settings</Ext>{" "}
+                  (the phone app doesn&apos;t have this).
+                </li>
+                <li>
+                  On the left, under <b>Settings for my calendars</b>, click the calendar you want.
+                </li>
+                <li>
+                  Scroll down to <b>Integrate calendar</b> and copy <b>Secret address in iCal format</b>. It ends in{" "}
+                  <b>.ics</b>.
+                </li>
+                <li>Paste it here. For more than one calendar, separate the links with commas.</li>
+              </Help>
+            }
+          >
+            <Input
+              type="password"
+              value={calendarUrls}
+              onChange={setCalendarUrls}
+              placeholder={hasCalendar ? "Leave blank to keep your saved links" : "https://calendar.google.com/calendar/ical/…"}
+            />
+          </Field>
         </Section>
 
         <Section
@@ -136,13 +184,29 @@ export default function SetupForm({ saved, firstRun, installed, version }) {
           onRemove={hasEmail ? () => remove("resendApiKey") : null}
         >
           <p className="text-sm" style={{ color: MUTED }}>
-            Emails you what&apos;s due, using a free{" "}
-            <a href="https://resend.com" target="_blank" rel="noreferrer" className="underline">
-              Resend
-            </a>{" "}
-            account. Without your own domain, Resend only sends to the email you signed up with.
+            Emails you what&apos;s due each morning, using a free Resend account.
           </p>
-          <Field label="Resend API key">
+          <Field
+            label="Resend API key"
+            help={
+              <Help note="Without your own domain, Resend only delivers to the email you signed up with, so use that one below. Leave Send from blank unless you verified a domain in Resend.">
+                <li>
+                  Make a free account at <Ext href="https://resend.com/signup">resend.com</Ext>, using the email you
+                  want the summary sent to.
+                </li>
+                <li>
+                  Go to <Ext href="https://resend.com/api-keys">API Keys</Ext> and click <b>Create API Key</b>.
+                </li>
+                <li>
+                  Name it &quot;School Dashboard&quot;, set <b>Permission</b> to <b>Sending access</b>, and click{" "}
+                  <b>Add</b>.
+                </li>
+                <li>
+                  Copy the key (it starts with <b>re_</b>). Resend only shows it once.
+                </li>
+              </Help>
+            }
+          >
             <Input
               type="password"
               value={resendApiKey}
@@ -159,7 +223,10 @@ export default function SetupForm({ saved, firstRun, installed, version }) {
         </Section>
 
         <Section title="Time zone" note="Used for the morning email">
-          <Input value={timezone} onChange={setTimezone} placeholder="America/New_York" />
+          <Input value={timezone} onChange={setTimezone} placeholder="America/New_York" aria-label="Time zone" />
+          <p className="text-xs" style={{ color: MUTED }}>
+            Filled in from your computer. Names look like America/New_York or America/Chicago.
+          </p>
         </Section>
 
         {error && (
@@ -305,20 +372,64 @@ function Section({ title, note, open = true, status, onRemove, children }) {
   );
 }
 
-function Field({ label, hint, children }) {
+// `help` sits outside the <label> so clicking its links doesn't jump to the text box.
+function Field({ label, help, children }) {
   return (
-    <label className="flex flex-col gap-1">
-      <span className="text-sm font-bold" style={{ color: INK }}>
-        {label}
-      </span>
-      {children}
-      {hint && (
-        <span className="text-xs" style={{ color: MUTED }}>
-          {hint}
+    <div className="flex flex-col gap-1.5">
+      <label className="flex flex-col gap-1">
+        <span className="text-sm font-bold" style={{ color: INK }}>
+          {label}
         </span>
-      )}
-    </label>
+        {children}
+      </label>
+      {help}
+    </div>
   );
+}
+
+// A "How do I find this?" dropdown with numbered steps.
+function Help({ children, note }) {
+  return (
+    <details className="group">
+      <summary
+        className="inline-flex cursor-pointer list-none items-center gap-1 text-xs font-bold hover:underline"
+        style={{ color: "var(--blue-fg)" }}
+      >
+        <span className="inline-block transition-transform group-open:rotate-90" aria-hidden="true">
+          ›
+        </span>
+        How do I find this?
+      </summary>
+      <div className="mt-2 rounded-xl p-3 text-sm leading-snug" style={{ background: "var(--surface-2)", color: "var(--ink-soft)" }}>
+        <ol className="list-decimal space-y-1.5 pl-5">{children}</ol>
+        {note && (
+          <p className="mt-2.5 text-xs" style={{ color: MUTED }}>
+            {note}
+          </p>
+        )}
+      </div>
+    </details>
+  );
+}
+
+function Ext({ href, children }) {
+  return (
+    <a href={href} target="_blank" rel="noreferrer" className="font-bold underline" style={{ color: INK }}>
+      {children}
+    </a>
+  );
+}
+
+// The user's Canvas settings page, once they've typed their Canvas address.
+function canvasSettingsUrl(address) {
+  const text = String(address || "").trim();
+  if (!text) return "";
+  try {
+    const url = new URL(/^https?:\/\//i.test(text) ? text : `https://${text}`);
+    return url.hostname.includes(".") ? `${url.origin}/profile/settings` : "";
+  } catch {
+    return "";
+  }
 }
 
 function Input({ value, onChange, type = "text", ...rest }) {
@@ -329,8 +440,8 @@ function Input({ value, onChange, type = "text", ...rest }) {
       onChange={(e) => onChange(e.target.value)}
       autoComplete="off"
       spellCheck={false}
-      className="w-full rounded-xl border px-3 py-2 text-sm outline-none focus:border-[var(--ink-soft)]"
-      style={{ background: "var(--field)", borderColor: "var(--line)", color: INK }}
+      className="w-full rounded-lg px-3 py-2 text-sm"
+      style={{ background: "var(--field)", color: INK }}
       {...rest}
     />
   );

@@ -71,7 +71,7 @@ export default function ManageClasses({ allCourses, onClose, onSaved, onError })
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label="Manage classes">
-      <button className="absolute inset-0 bg-[#1C1A2E]/40" onClick={onClose} aria-label="Close" />
+      <button className="absolute inset-0 bg-[var(--overlay)]" onClick={onClose} aria-label="Close" />
       <div className="relative flex h-full w-full max-w-lg flex-col bg-[var(--bg)]">
         <div className="flex items-start justify-between gap-4 p-6 pb-3">
           <div>

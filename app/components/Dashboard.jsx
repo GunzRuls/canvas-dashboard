@@ -630,7 +630,7 @@ export default function Dashboard({
           className="fixed bottom-5 right-5 z-[60] flex max-w-sm items-center rounded-xl px-4 py-3 text-sm font-semibold shadow-lg"
           style={
             toast.tone === "error"
-              ? { background: "#B4123E", color: "#FFFFFF" }
+              ? { background: "var(--red-fg)", color: "var(--bg)" }
               : { background: "var(--inverse)", color: "var(--inverse-fg)" }
           }
         >
@@ -923,7 +923,7 @@ function CardList({ cards, collapseAfter, renderCard, emptyText }) {
 
 function Badge({ text, bg, fg }) {
   return (
-    <span className="rounded px-1.5 py-px text-[11px] font-bold" style={{ background: bg, color: fg }}>
+    <span className="rounded-md px-1.5 py-px text-[11px] font-bold" style={{ background: bg, color: fg }}>
       {text}
     </span>
   );
@@ -1017,7 +1017,7 @@ function TaskCard({
               target="_blank"
               rel="noreferrer"
               onClick={() => onOpenAnnouncement(a)}
-              className="flex items-center gap-1.5 rounded bg-[var(--purple-bg)] px-1.5 py-0.5 text-[11px] font-bold hover:underline"
+              className="flex items-center gap-1.5 rounded-md bg-[var(--purple-bg)] px-1.5 py-0.5 text-[11px] font-bold hover:underline"
               style={{ color: "var(--purple-fg)" }}
               title={a.title}
             >
@@ -1064,7 +1064,7 @@ function MoveButton({ children, onClick, strong, color }) {
   return (
     <button
       onClick={onClick}
-      className="rounded px-2 py-0.5 text-xs font-bold"
+      className="rounded-md px-2 py-0.5 text-xs font-bold"
       style={strong ? { background: color, color: "white" } : { background: "var(--chip)", color: INK }}
     >
       {children}
@@ -1116,7 +1116,7 @@ function AnnouncementCard({ announcement: a, now, unread, color, courseName, onR
           )}
           <button
             onClick={onDone}
-            className="rounded px-2 py-0.5 font-bold text-white"
+            className="rounded-md px-2 py-0.5 font-bold text-white"
             style={{ background: color }}
           >
             Done
