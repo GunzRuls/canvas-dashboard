@@ -113,7 +113,11 @@ export default function WeekStrip({ items, status, events, calendarEnabled, now,
       </div>
       {!calendarEnabled && (
         <p className="mt-1 text-xs" style={{ color: MUTED }}>
-          Add your Google Calendar link as GOOGLE_CALENDAR_ICS_URL in .env.local to see shifts and plans here.
+          Add your Google Calendar in{" "}
+          <a href="/setup" className="font-bold underline">
+            Settings
+          </a>{" "}
+          to see shifts and plans here.
         </p>
       )}
     </div>

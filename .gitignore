@@ -35,8 +35,10 @@ yarn-error.log*
 !.env.example
 
 # local dashboard data (personal, never commit)
+dashboard-config.json
 dashboard-settings.json
 dashboard-dismissed.json
+launcher/server.log
 
 # vercel
 .vercel

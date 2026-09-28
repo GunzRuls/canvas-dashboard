@@ -431,6 +431,7 @@ export default function Dashboard({
             {theme === "dark" ? "Light mode" : "Dark mode"}
           </TopButton>
           <TopButton onClick={() => setManaging(true)}>Manage classes</TopButton>
+          <TopButton onClick={() => window.location.assign("/setup")}>Settings</TopButton>
           {digestEnabled && (
             <TopButton onClick={emailSummary} disabled={sendingDigest}>
               {sendingDigest ? "Sending…" : "Email summary"}

@@ -1,11 +1,12 @@
 import { loadDashboard } from "@/lib/loadDashboard";
 import { buildDigest, sendDigest, digestEnabled } from "@/lib/digest";
+import { getConfig } from "@/lib/config";
 
 async function run() {
-  if (!digestEnabled()) throw new Error("Add RESEND_API_KEY and DIGEST_TO_EMAIL to .env.local first.");
+  if (!digestEnabled()) throw new Error("Turn on the morning email in Settings first.");
   const { courses, items, announcements } = await loadDashboard({ withCalendar: false, withAttendance: false, withGrades: false });
   await sendDigest(buildDigest({ courses, items, announcements }));
-  return Response.json({ ok: true, to: process.env.DIGEST_TO_EMAIL });
+  return Response.json({ ok: true, to: getConfig().digestToEmail });
 }
 
 // Scheduled runs use GET. If CRON_SECRET is set, the request must carry it.

@@ -6,14 +6,18 @@ A local Next.js (App Router, plain JavaScript, Tailwind v4) dashboard that pulls
 
 ## How it runs
 
-- Normal use is production mode through the desktop launcher (`launcher/start-dashboard.ps1`): it checks port 3000, rebuilds only if files in `app/` or `lib/` are newer than `.next/BUILD_ID`, then runs `npm run build && npm run start` in a minimized cmd window titled "School Dashboard", and opens Chrome or Edge with `--app=http://localhost:3000`.
-- Closing the app window does NOT stop the server; closing the minimized cmd window does. After changing `.env.local`, the server must be restarted. If `npm run dev` is also running, the launcher just opens the old server on port 3000.
+- Classmates install by double-clicking `Install.cmd` (checks Node, `npm install`, runs `launcher/create-shortcut.ps1` for the desktop icon, then launches). A prebuilt .lnk can't be shipped because shortcuts hold absolute paths.
+- Normal use is production mode through the desktop launcher (`launcher/start-dashboard.ps1`): it checks port 3000, rebuilds only if `app/`, `lib/`, `instrumentation.js` or `package.json` are newer than `.next/BUILD_ID`, then runs `npm run build && npm run start` in a hidden cmd (output to `launcher/server.log`, gitignored) with `DASHBOARD_AUTO_STOP=1`, shows a small WinForms "Starting..." box meanwhile, and opens Chrome or Edge with `--app=http://localhost:3000`.
+- Auto-stop: `instrumentation.js` starts `lib/autoStop.js` only when `DASHBOARD_AUTO_STOP=1`. Every page (via `app/components/KeepAlive.jsx` in the layout) POSTs `/api/alive` every 20 s and sends `?closing=1` on pagehide. The server exits 45 s after a close with no further check-in, or after 10 min of silence (minimized windows can be throttled). A long gap between ticks (PC asleep) resets the clock. Plain `npm run start`/`npm run dev` never auto-stop.
+- The server binds to 127.0.0.1 only (`-H 127.0.0.1` in both scripts) so nobody on the same Wi-Fi can reach it. Keep it that way; `/api/config` can change where the token is sent.
 - For development use `npm run dev` (stop the launcher's server first).
 - PowerShell on this machine needed `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` for npm/npx.
 
-## Environment (.env.local, never commit)
+## Configuration (setup screen, never commit)
 
-`CANVAS_BASE_URL`, `CANVAS_TOKEN` (required). Optional: `GOOGLE_CALENDAR_ICS_URL` (comma-separated secret iCal links), `RESEND_API_KEY` + `DIGEST_TO_EMAIL` (+ optional `DIGEST_FROM_EMAIL`), `DASHBOARD_TIMEZONE` (default America/New_York), `CRON_SECRET`. Features hide themselves when their variables are missing. See `.env.example`.
+On first launch `app/page.js` redirects to `/setup` until a Canvas address and token exist. `/setup` doubles as the Settings screen (Settings button in the top bar). Canvas is required; Google Calendar and Resend are optional. `lib/config.js` is the only place settings are read: `getConfig()` reads `dashboard-config.json` (gitignored) fresh on each call, falling back per key to `.env.local` (`CANVAS_BASE_URL`, `CANVAS_TOKEN`, `GOOGLE_CALENDAR_ICS_URL`, `RESEND_API_KEY`, `DIGEST_TO_EMAIL`, `DIGEST_FROM_EMAIL`, `DASHBOARD_TIMEZONE`). Changes apply without a restart. `CRON_SECRET` stays env-only. Features hide themselves when their settings are missing.
+
+`POST /api/config` rules: rejects requests whose Origin doesn't match the Host; checks the token against `/api/v1/users/self` and calendar links for `BEGIN:VCALENDAR` before saving; a blank secret field means keep the saved value; changing the Canvas address requires re-entering the token (so a saved token is never sent to a new host). The browser only ever gets `publicConfig()` (token's last 4 characters, calendar count, whether a Resend key exists).
 
 Resend note: without a verified domain, Resend only delivers to the email the Resend account was created with.
 
@@ -52,5 +56,5 @@ Auto-start with Windows, desktop notifications (Canvas already notifies), study-
 ## Working with the user
 
 - Explain changes plainly and briefly; he is learning as he goes.
-- Before committing, confirm `.env.local` and the two dashboard-*.json files are not staged.
-- After changes, remind him to close the "School Dashboard" server window and reopen from the desktop icon (the launcher rebuilds automatically).
+- Before committing, confirm `.env.local` and the three dashboard-*.json files (config, settings, dismissed) are not staged.
+- After changes, remind him to close the dashboard window, wait about a minute for the server to stop, and reopen from the desktop icon (the launcher rebuilds automatically).

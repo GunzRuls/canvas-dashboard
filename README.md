@@ -1,6 +1,6 @@
 # School Dashboard for Canvas
 
-A dashboard that puts your Canvas assignments, grades, announcements, and class check-ins on one screen. It runs on your own Windows PC. Your Canvas token stays on your computer and is never sent anywhere except Canvas.
+A dashboard that puts your Canvas assignments, grades, announcements, and class check-ins on one screen. It runs on your own Windows PC. Everything you enter is saved only on your computer, and your Canvas token is only ever sent to Canvas.
 
 ## What you need
 
@@ -8,47 +8,38 @@ A dashboard that puts your Canvas assignments, grades, announcements, and class 
 - [Node.js](https://nodejs.org) (the LTS version)
 - Google Chrome or Microsoft Edge
 
-## Setup
+## Install
 
-1. Download this repo (green **Code** button → **Download ZIP**, then unzip it) or `git clone` it.
-2. Open PowerShell in the project folder and install the dependencies:
+1. Download this repo: green **Code** button → **Download ZIP**, then unzip it somewhere you'll keep it (like your Documents folder).
+2. Double-click **Install.cmd** in the folder. It installs everything, puts a **School Dashboard** icon on your desktop, and opens the dashboard.
+3. The first time it opens, it asks for:
+   - **Your school's Canvas address**, like `yourschool.instructure.com`
+   - **A Canvas access token**: in Canvas go to **Account → Settings → Approved Integrations → + New Access Token**, then copy it.
 
-   ```powershell
-   npm install
-   ```
+   Google Calendar and the morning email are optional. You can add them now or later from **Settings** on the dashboard.
 
-   If PowerShell says running scripts is disabled, run this once and try again:
-
-   ```powershell
-   Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
-   ```
-
-3. Make a Canvas access token: in Canvas go to **Account → Settings → Approved Integrations → + New Access Token**. Copy it.
-4. Copy `.env.example` to a new file named `.env.local` and fill in:
-   - `CANVAS_BASE_URL`: your school's Canvas address, like `https://yourschool.instructure.com`
-   - `CANVAS_TOKEN`: the token from step 3
-
-   The other settings are optional. Features that need them stay hidden until you add them.
-
-5. Create the desktop icon:
-
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File launcher\create-shortcut.ps1
-   ```
-
-6. Double-click **School Dashboard** on your desktop. The first start takes a minute while it builds.
+If Windows shows "Windows protected your PC" when you run Install.cmd, click **More info → Run anyway**.
 
 ## Using it
 
-- Closing the dashboard window does not stop it. To stop it, close the minimized **School Dashboard** window on your taskbar.
-- After changing `.env.local`, stop it and open it again from the desktop icon.
-- Your class settings and dismissed items are saved in `dashboard-settings.json` and `dashboard-dismissed.json` in the project folder. They are personal and are not uploaded.
+- Open it from the **School Dashboard** icon on your desktop.
+- Close the window when you're done. The dashboard stops in the background by itself shortly after.
+- Change your Canvas token, Google Calendar, or email settings from the **Settings** button.
+- If something goes wrong while starting, the details are in `launcher\server.log`.
 
 ## Optional features
 
-- **Google Calendar:** in Google Calendar settings, copy the "Secret address in iCal format" into `GOOGLE_CALENDAR_ICS_URL`. Separate several links with commas.
-- **Morning email:** add a [Resend](https://resend.com) API key as `RESEND_API_KEY` and your email as `DIGEST_TO_EMAIL`. Without your own verified domain, Resend only sends to the email you signed up with.
+- **Google Calendar:** in Google Calendar settings, open a calendar and copy **Secret address in iCal format**.
+- **Morning email:** needs a free [Resend](https://resend.com) API key. Without your own verified domain, Resend only sends to the email you signed up with.
+
+## Your data
+
+These files stay in your dashboard folder and are never uploaded:
+
+- `dashboard-config.json`: your Canvas address, token, and optional keys
+- `dashboard-settings.json`: class names, colors, hidden classes, class times
+- `dashboard-dismissed.json`: announcements and grades you've cleared
 
 ## For developers
 
-Next.js (App Router), plain JavaScript, Tailwind v4. Run `npm run dev` for development (stop the desktop version first, since both use port 3000).
+Next.js (App Router), plain JavaScript, Tailwind v4. Run `npm run dev` (stop the desktop version first, since both use port 3000). Settings can also come from `.env.local` (see `.env.example`). Anything saved on the setup screen takes priority.

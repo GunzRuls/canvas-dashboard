@@ -1,5 +1,6 @@
 import { Bricolage_Grotesque } from "next/font/google";
 import "./globals.css";
+import KeepAlive from "./components/KeepAlive";
 
 const bricolage = Bricolage_Grotesque({
   variable: "--font-bricolage",
@@ -20,7 +21,10 @@ export default function RootLayout({ children }) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        {children}
+        <KeepAlive />
+      </body>
     </html>
   );
 }
