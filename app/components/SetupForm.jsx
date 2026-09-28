@@ -7,7 +7,7 @@ const MUTED = "var(--muted)";
 const RELEASES_URL = "https://github.com/GunzRuls/canvas-dashboard/releases/latest";
 
 // Saved tokens and keys are never sent to this page. For those, a blank box means "keep it".
-export default function SetupForm({ saved, firstRun, installed }) {
+export default function SetupForm({ saved, firstRun, installed, version }) {
   const [canvasBaseUrl, setCanvasBaseUrl] = useState(saved.canvasBaseUrl);
   const [canvasToken, setCanvasToken] = useState("");
   const [calendarUrls, setCalendarUrls] = useState("");
@@ -185,13 +185,13 @@ export default function SetupForm({ saved, firstRun, installed }) {
         </div>
       </form>
 
-      {!firstRun && <Maintenance installed={installed} />}
+      {!firstRun && <Maintenance installed={installed} version={version} />}
     </main>
   );
 }
 
 // Reinstall and uninstall run as scripts in their own window (Install.cmd / Uninstall.cmd).
-function Maintenance({ installed }) {
+function Maintenance({ installed, version }) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -221,7 +221,7 @@ function Maintenance({ installed }) {
       </span>
       <p className="mt-2 text-sm" style={{ color: MUTED }}>
         {installed
-          ? "To update, download the latest installer and run it. Your settings are kept. Uninstall asks whether to keep your settings."
+          ? `${version ? `You have version ${version}. ` : ""}When a new version is out, an Update button appears at the top of the dashboard. Uninstall asks whether to keep your settings.`
           : "Reinstall starts fresh if something seems broken and keeps your settings. Uninstall removes the desktop icon and installed files, then asks whether to keep your settings."}
       </p>
       <div className="mt-3 flex flex-wrap gap-2">

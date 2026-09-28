@@ -6,6 +6,7 @@ import WeekStrip from "./WeekStrip";
 import QuickAdd from "./QuickAdd";
 import WhatIfPanel from "./WhatIfPanel";
 import ManageClasses from "./ManageClasses";
+import UpdateNotice from "./UpdateNotice";
 
 const INK = "var(--ink)";
 const MUTED = "var(--muted)";
@@ -432,6 +433,7 @@ export default function Dashboard({
           </TopButton>
           <TopButton onClick={() => setManaging(true)}>Manage classes</TopButton>
           <TopButton onClick={() => window.location.assign("/setup")}>Settings</TopButton>
+          <UpdateNotice />
           {digestEnabled && (
             <TopButton onClick={emailSummary} disabled={sendingDigest}>
               {sendingDigest ? "Sending…" : "Email summary"}

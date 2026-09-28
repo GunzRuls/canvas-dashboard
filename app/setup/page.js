@@ -1,5 +1,6 @@
 import SetupForm from "../components/SetupForm";
 import { isConfigured, publicConfig } from "@/lib/config";
+import { currentVersion } from "@/lib/updates";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ export default function SetupPage() {
       saved={publicConfig()}
       firstRun={!isConfigured()}
       installed={Boolean(process.env.DASHBOARD_INSTALL_DIR)}
+      version={currentVersion()}
     />
   );
 }

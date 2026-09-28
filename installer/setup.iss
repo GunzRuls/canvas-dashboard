@@ -54,7 +54,8 @@ Name: "{userprograms}\{#AppName}"; Filename: "{sys}\WindowsPowerShell\v1.0\power
 Name: "{userdesktop}\{#AppName}"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "{#Launch}"; WorkingDir: "{app}"; IconFilename: "{app}\launcher\dashboard.ico"; Comment: "Open the School Dashboard"; Flags: runminimized; Tasks: desktopicon
 
 [Run]
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "{#Launch}"; Description: "Open School Dashboard now"; Flags: postinstall nowait skipifsilent runhidden
+; Also runs after the in-app Update button's /SILENT install, so the dashboard reopens by itself.
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "{#Launch}"; Description: "Open School Dashboard now"; Flags: postinstall nowait runhidden
 
 [UninstallRun]
 Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\launcher\stop-dashboard.ps1"""; Flags: runhidden; RunOnceId: "StopDashboard"

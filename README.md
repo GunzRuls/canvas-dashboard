@@ -25,7 +25,7 @@ You need Windows 10 or 11 and Google Chrome or Microsoft Edge. Nothing else.
 
 ## Update or uninstall
 
-- **Update:** download the newest **School-Dashboard-Setup.exe** from the [latest release](https://github.com/GunzRuls/canvas-dashboard/releases/latest) and run it. Your settings are kept.
+- **Update:** when a new version is out, an **Update to x.y.z** button appears at the top of the dashboard. Click it and the dashboard updates and reopens by itself. Your settings are kept. You can also download the newest **School-Dashboard-Setup.exe** from the [latest release](https://github.com/GunzRuls/canvas-dashboard/releases/latest) and run it.
 - **Uninstall:** Windows **Settings → Apps → Installed apps → School Dashboard → Uninstall**, or **Settings → Uninstall** in the dashboard. It asks whether to keep your saved settings.
 - After uninstalling, you can also delete your token in Canvas: **Account → Settings → Approved Integrations**.
 
@@ -48,4 +48,4 @@ Your settings are saved in `%APPDATA%\School Dashboard` and are never uploaded:
 Next.js (App Router), plain JavaScript, Tailwind v4.
 
 - **Run from source:** install [Node.js](https://nodejs.org) (LTS), then double-click **Install.cmd** (or run `npm ci`). The desktop icon then runs this folder, rebuilding when code changes, and personal files are kept in the folder itself. **Uninstall.cmd** removes it. For development, run `npm run dev` (stop the desktop version first, since both use port 3000). Settings can also come from `.env.local` (see `.env.example`); anything saved on the setup screen takes priority.
-- **Release a new installer:** on GitHub, **Releases → Draft a new release**, create a tag like `v1.0.0`, and publish. The **Build installer** workflow builds `School-Dashboard-Setup.exe` and attaches it to the release in a few minutes. You can also run the workflow by hand from the **Actions** tab to get a test build.
+- **Release a new installer:** on GitHub, **Releases → Draft a new release**, create a tag with a higher number than the last one (like `v1.1.0`), and publish. The tag becomes the app's version, and installed copies offer the update the next time they open. The **Build installer** workflow builds `School-Dashboard-Setup.exe` and attaches it to the release in a few minutes. You can also run the workflow by hand from the **Actions** tab to get a test build.

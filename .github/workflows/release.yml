@@ -24,6 +24,15 @@ jobs:
 
       - run: npm ci
 
+      # The release tag (v1.2.0 -> 1.2.0) becomes the app's version. Manual test runs get
+      # 0.0.0-dev, which never counts as newer than a real release.
+      - name: Work out the version
+        shell: pwsh
+        run: |
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME -replace '^v', '' } else { '0.0.0-dev' }
+          "DASHBOARD_VERSION=$version" >> $env:GITHUB_ENV
+          "Version $version"
+
       - run: npm run build
         env:
           BUILD_STANDALONE: "1"
@@ -54,8 +63,7 @@ jobs:
       - name: Build the installer
         shell: pwsh
         run: |
-          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME -replace '^v', '' } else { '0.0.0-dev' }
-          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$version" installer/setup.iss
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$env:DASHBOARD_VERSION" installer/setup.iss
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed." }
 
       - uses: actions/upload-artifact@v4
