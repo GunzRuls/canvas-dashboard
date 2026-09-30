@@ -65,7 +65,7 @@ function Row({ href, onClick, icon, tone, title, sub, subColor }) {
       target="_blank"
       rel="noreferrer"
       onClick={onClick}
-      className="row-hover group -mx-2 flex gap-2.5 rounded-lg px-2 py-1.5"
+      className="row-hover-soft group -mx-2 flex gap-2.5 rounded-lg px-2 py-1.5"
     >
       <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg" style={{ background: tone.bg, color: tone.fg }} aria-hidden="true">
         {icon}
@@ -110,7 +110,7 @@ export default function NextClassCard({ now, courses, sessions, items, status, a
 
   if (!card) {
     return (
-      <section className="panel flex flex-col justify-center gap-2 p-4" aria-label="Next class">
+      <section className="panel flex flex-col justify-center gap-2 p-4" style={{ background: "var(--brand-tint)" }} aria-label="Next class">
         <span className="text-[11px] font-extrabold uppercase tracking-wide" style={{ color: MUTED }}>
           Next class
         </span>
@@ -137,6 +137,8 @@ export default function NextClassCard({ now, courses, sessions, items, status, a
       className="panel flex flex-col gap-3 p-4 transition-shadow"
       style={{
         "--c": course.color,
+        // Tinted in the class color so it stands apart from the white panels around it.
+        background: "color-mix(in srgb, var(--c) 13%, var(--surface))",
         boxShadow: highlight ? `0 0 0 2px ${course.color}, 0 8px 22px var(--shadow)` : undefined,
       }}
       aria-label={eyebrow}
@@ -221,7 +223,7 @@ export default function NextClassCard({ now, courses, sessions, items, status, a
         </div>
       )}
       {!card.urgent && !card.announcement && (
-        <p className="rounded-lg px-3 py-2 text-xs" style={{ background: "var(--surface-2)", color: MUTED }}>
+        <p className="rounded-lg px-3 py-2 text-xs" style={{ background: "color-mix(in srgb, var(--surface) 70%, transparent)", color: MUTED }}>
           Nothing due for this class this week.
         </p>
       )}

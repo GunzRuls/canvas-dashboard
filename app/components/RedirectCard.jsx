@@ -4,10 +4,13 @@ import { useEffect, useRef, useState } from "react";
 
 // "Sending you to Canvas": the dashboard runs in an app window, so links that open a new tab land
 // in your normal browser with no sign in here. This card confirms where you're going. It listens
-// for clicks on any outside link in the whole app, never blocks or delays the link, and can't be
-// clicked (pointer-events: none), so it never gets in the way.
+// for clicks on any outside link in the whole app and can't be clicked (pointer-events: none).
+// The new window takes focus the moment it opens, which hid the card, so a plain click shows the
+// card first and opens the page when its bar fills (OPEN_MS; the user asked to see it). Ctrl/Shift/
+// middle clicks still open right away.
 
-const SHOW_MS = 1700; // matches the design: the bar fills in 1.5 s, the card leaves at 1.7 s
+const OPEN_MS = 800; // the bar fills in this time (.redirect-bar in globals.css), then the page opens
+const SHOW_MS = 1100; // the card stays a moment after the page opens, then fades
 const FADE_MS = 200;
 
 // Link texts that don't say anything on their own ("Open", "Grades"...).
@@ -124,20 +127,21 @@ export default function RedirectCard() {
         return;
       }
       if (!/^https?:$/.test(url.protocol) || url.origin === window.location.origin) return;
+      if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return; // "open in new tab" style clicks: no card, no delay
 
+      e.preventDefault();
       const info = describe(link, url);
       timers.current.forEach(clearTimeout);
       setGo({ ...info, id: Date.now(), leaving: false });
       timers.current = [
+        // Still inside the click's permission window, so the browser allows it.
+        setTimeout(() => window.open(url.href, "_blank", "noopener,noreferrer"), OPEN_MS),
         setTimeout(() => setGo((g) => g && { ...g, leaving: true }), SHOW_MS),
         setTimeout(() => setGo(null), SHOW_MS + FADE_MS),
       ];
     }
     window.addEventListener("click", onClick);
-    return () => {
-      window.removeEventListener("click", onClick);
-      timers.current.forEach(clearTimeout);
-    };
+    return () => window.removeEventListener("click", onClick);
   }, []);
 
   return (
@@ -169,7 +173,7 @@ export default function RedirectCard() {
               <div className="redirect-bar c-dot h-1.5 rounded-full" />
             </div>
             <p className="text-xs" style={{ color: "var(--muted)" }}>
-              Opens in your browser
+              Opening in your browser…
             </p>
           </div>
         </div>
