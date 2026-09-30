@@ -1,6 +1,7 @@
 import { loadDashboard } from "@/lib/loadDashboard";
 import { buildDigest, sendDigest, digestEnabled } from "@/lib/digest";
 import { getConfig } from "@/lib/config";
+import { fromThisApp } from "@/lib/sameOrigin";
 
 async function run() {
   if (!digestEnabled()) throw new Error("Turn on the morning email in Settings first.");
@@ -9,10 +10,11 @@ async function run() {
   return Response.json({ ok: true, to: getConfig().digestToEmail });
 }
 
-// Scheduled runs use GET. If CRON_SECRET is set, the request must carry it.
+// For an outside scheduler only, and only when CRON_SECRET is set. The daily email normally
+// comes from the Windows task, which uses POST (launcher/start-dashboard.ps1 -SendDigest).
 export async function GET(request) {
   const secret = process.env.CRON_SECRET;
-  if (secret && request.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
     return Response.json({ ok: false, error: "Not authorized" }, { status: 401 });
   }
   try {
@@ -22,8 +24,12 @@ export async function GET(request) {
   }
 }
 
-// The "Email me today's summary" button uses POST.
-export async function POST() {
+// The "Email summary" and "Send a test email" buttons, and the daily Windows task.
+// Same-origin only, so a website open in another tab can't make it send you mail.
+export async function POST(request) {
+  if (!fromThisApp(request)) {
+    return Response.json({ ok: false, error: "Not allowed." }, { status: 403 });
+  }
   try {
     return await run();
   } catch (error) {

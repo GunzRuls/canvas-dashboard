@@ -19,6 +19,8 @@ if (-not (Ask "Uninstall the dashboard?")) {
 }
 
 & (Join-Path $PSScriptRoot "stop-dashboard.ps1")
+# The daily morning email task, if one was set up.
+& (Join-Path $PSScriptRoot "schedule-digest.ps1") -Days off | Out-Null
 
 # The desktop icon, only if it opens this copy of the dashboard.
 $shortcut = Join-Path ([Environment]::GetFolderPath("Desktop")) "School Dashboard.lnk"

@@ -47,6 +47,7 @@ Source: "..\.next\standalone\*"; DestDir: "{app}\app"; Flags: ignoreversion recu
 Source: "..\.next\static\*"; DestDir: "{app}\app\.next\static"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\launcher\start-dashboard.ps1"; DestDir: "{app}\launcher"; Flags: ignoreversion
 Source: "..\launcher\stop-dashboard.ps1"; DestDir: "{app}\launcher"; Flags: ignoreversion
+Source: "..\launcher\schedule-digest.ps1"; DestDir: "{app}\launcher"; Flags: ignoreversion
 Source: "..\launcher\dashboard.ico"; DestDir: "{app}\launcher"; Flags: ignoreversion
 
 [Icons]
@@ -59,6 +60,8 @@ Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "{#Launch}"
 
 [UninstallRun]
 Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\launcher\stop-dashboard.ps1"""; Flags: runhidden; RunOnceId: "StopDashboard"
+; Remove the daily morning email task (launcher\schedule-digest.ps1), if there is one.
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\launcher\schedule-digest.ps1"" -Days off"; Flags: runhidden; RunOnceId: "RemoveEmailTask"
 
 [UninstallDelete]
 ; Files the app creates while running (like its cache).

@@ -32,7 +32,7 @@ You need Windows 10 or 11 and Google Chrome or Microsoft Edge. Nothing else.
 ## Optional features
 
 - **Google Calendar:** in Google Calendar settings, open a calendar and copy **Secret address in iCal format**.
-- **Morning email:** needs a free [Resend](https://resend.com) API key. Without your own verified domain, Resend only sends to the email you signed up with.
+- **Morning email:** a short list of what's due, every morning at the time you pick. The easiest way is your own **Gmail** with an app password (Settings shows the steps); it can send to any inbox, like your school email. A free [Resend](https://resend.com) account works too. It sends even when the dashboard is closed, as long as your PC is on; if the PC was off, it sends when you turn it on.
 
 ## Your data
 

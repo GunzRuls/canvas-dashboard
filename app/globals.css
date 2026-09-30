@@ -171,6 +171,25 @@ textarea::placeholder {
   user-select: none;
 }
 
+/* Loading screen: a bar that slides back and forth, and a gently floating icon. */
+@keyframes loading-bar {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+.loading-bar { animation: loading-bar 1.2s ease-in-out infinite; }
+@keyframes loading-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.loading-float { animation: loading-float 2.4s ease-in-out infinite; }
+
+/* Onboarding: each step fades up into place. */
+@keyframes step-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.step-in { animation: step-in 0.25s ease-out; }
+
 @keyframes live-dot {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }

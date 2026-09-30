@@ -1,5 +1,7 @@
 import { getConfig, saveConfig, SECRET_FIELDS } from "@/lib/config";
 import { fromThisApp } from "@/lib/sameOrigin";
+import { digestEnabled, gmailTransport, gmailErrorMessage } from "@/lib/digest";
+import { scheduleDigest } from "@/lib/schedule";
 
 // Saves what you enter on the setup screen. Canvas is checked before anything is saved.
 // Blank secret fields mean "keep what's saved"; names listed in `clear` are removed.
@@ -53,6 +55,21 @@ async function checkCanvas(base, token) {
   return user.short_name || user.name || "";
 }
 
+// For the "found 6 classes" confirmation during onboarding. Not worth failing the save over.
+async function countClasses(base, token) {
+  try {
+    const res = await fetch(`${base}/api/v1/courses?enrollment_state=active&enrollment_type=student&per_page=100`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const courses = await res.json();
+    return courses.filter((c) => c.name && !c.access_restricted_by_date).length;
+  } catch {
+    return null;
+  }
+}
+
 async function checkCalendars(links) {
   for (const url of links.split(",").filter(Boolean)) {
     let res;
@@ -65,6 +82,44 @@ async function checkCalendars(links) {
       throw new Error("One of your Google Calendar links didn't return a calendar. Use the secret iCal address.");
     }
   }
+}
+
+// The morning email fields. Only fields the form sent are changed, so a save from the Canvas
+// or calendar step leaves the email settings alone.
+function applyEmailSettings(body, next) {
+  const has = (key) => Object.prototype.hasOwnProperty.call(body, key);
+  if (has("emailProvider")) {
+    const provider = String(body.emailProvider || "");
+    if (!["", "gmail", "resend"].includes(provider)) throw new Error("Pick Gmail or Resend for the morning email.");
+    next.emailProvider = provider;
+  }
+  if (has("gmailAddress")) next.gmailAddress = String(body.gmailAddress || "").trim().toLowerCase();
+  if (has("digestToEmail")) next.digestToEmail = String(body.digestToEmail || "").trim();
+  if (has("digestFromEmail")) next.digestFromEmail = String(body.digestFromEmail || "").trim();
+  if (has("sendTime")) {
+    const time = String(body.sendTime || "").trim();
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) throw new Error("Pick a time for the morning email, like 7:00 AM.");
+    next.sendTime = time;
+  }
+  if (has("sendDays")) {
+    if (!["daily", "weekdays"].includes(body.sendDays)) throw new Error("Pick Every day or Weekdays.");
+    next.sendDays = body.sendDays;
+  }
+
+  if (next.emailProvider === "gmail") {
+    if (!EMAIL.test(next.gmailAddress)) throw new Error("Enter the Gmail address that will send the email.");
+    next.gmailAppPassword = String(next.gmailAppPassword || "").replace(/\s+/g, "");
+    if (!next.gmailAppPassword) throw new Error("Paste the 16-letter app password from Google.");
+    if (!/^[a-z]{16}$/i.test(next.gmailAppPassword)) {
+      throw new Error("App passwords are 16 letters. Copy the whole thing from Google (the spaces don't matter).");
+    }
+    next.digestToEmail ||= next.gmailAddress;
+  }
+  if (next.emailProvider === "resend") {
+    if (!next.resendApiKey) throw new Error("Add your Resend API key to turn on the morning email.");
+    if (!next.digestToEmail) throw new Error("Add the email address the summary should go to.");
+  }
+  if (next.digestToEmail && !EMAIL.test(next.digestToEmail)) throw new Error("That email address doesn't look right.");
 }
 
 export async function POST(request) {
@@ -90,11 +145,7 @@ export async function POST(request) {
     if (!next.canvasToken) throw new Error("Paste your Canvas access token.");
 
     next.calendarUrls = calendarLinks(next.calendarUrls);
-    next.digestToEmail = String(body.digestToEmail || "").trim();
-    next.digestFromEmail = String(body.digestFromEmail || "").trim();
-    if (next.resendApiKey && !next.digestToEmail) throw new Error("Add the email address the summary should go to.");
-    if (next.digestToEmail && !EMAIL.test(next.digestToEmail)) throw new Error("That email address doesn't look right.");
-    if (next.digestToEmail && !next.resendApiKey) throw new Error("Add your Resend API key to turn on the morning email.");
+    applyEmailSettings(body, next);
 
     next.timezone = String(body.timezone || "").trim() || "America/New_York";
     try {
@@ -105,9 +156,35 @@ export async function POST(request) {
 
     const name = await checkCanvas(next.canvasBaseUrl, next.canvasToken);
     if (next.calendarUrls !== current.calendarUrls) await checkCalendars(next.calendarUrls);
+    const gmailChanged =
+      next.emailProvider === "gmail" &&
+      (current.emailProvider !== "gmail" || next.gmailAddress !== current.gmailAddress || next.gmailAppPassword !== current.gmailAppPassword);
+    if (gmailChanged) {
+      try {
+        await gmailTransport(next).verify();
+      } catch (error) {
+        throw new Error(gmailErrorMessage(error));
+      }
+    }
 
     saveConfig(next);
-    return Response.json({ ok: true, name });
+
+    // Create, change, or remove the daily email task when its settings changed.
+    const enabled = digestEnabled(next);
+    let scheduleWarning = "";
+    if (enabled !== digestEnabled(current) || next.sendTime !== current.sendTime || next.sendDays !== current.sendDays) {
+      await scheduleDigest({ sendTime: next.sendTime, sendDays: next.sendDays, enabled }).catch((error) => {
+        scheduleWarning = error.message;
+      });
+    }
+
+    return Response.json({
+      ok: true,
+      name,
+      classes: await countClasses(next.canvasBaseUrl, next.canvasToken),
+      emailOn: enabled,
+      scheduleWarning,
+    });
   } catch (error) {
     return Response.json({ ok: false, error: error.message }, { status: 400 });
   }

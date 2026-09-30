@@ -2,12 +2,28 @@
 # Starts the dashboard in the background if it isn't already running, then opens it.
 # Works both for the installed app (School-Dashboard-Setup.exe) and for the project folder.
 # The server has no window. It stops by itself a little after you close the dashboard window.
+#
+# -SendDigest: used by the daily "School Dashboard Morning Email" task (schedule-digest.ps1).
+# Nothing is shown. It starts the server only if needed, sends the morning email, and stops
+# only a server it started itself. The result goes to email.log.
+
+param([switch]$SendDigest)
 
 $Project   = Split-Path -Parent $PSScriptRoot
 $Port      = 3000
 $Url       = "http://localhost:$Port"
 $Log       = Join-Path $PSScriptRoot "server.log"
 $AppWindow = $true   # $true = its own window like an app. $false = a normal browser tab.
+$Quiet     = [bool]$SendDigest
+$started   = $null   # the server process this run started, if any
+
+# Installed with School-Dashboard-Setup.exe: the app comes prebuilt with its own Node.js.
+$Node      = Join-Path $Project "node\node.exe"
+$ServerJs  = Join-Path $Project "app\server.js"
+$Installed = (Test-Path $Node) -and (Test-Path $ServerJs)
+# Personal files (and logs) live in AppData for the installed app, next to the launcher otherwise.
+$DataDir   = if ($Installed) { Join-Path $env:APPDATA "School Dashboard" } else { $PSScriptRoot }
+$EmailLog  = Join-Path $DataDir "email.log"
 
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
 
@@ -22,12 +38,23 @@ function Test-Running {
     }
 }
 
+function Write-EmailLog($message) {
+    New-Item -ItemType Directory -Force $DataDir | Out-Null
+    Add-Content -Path $EmailLog -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  $message" -Encoding UTF8
+}
+
 function Show-Error($message) {
+    if ($Quiet) { Write-EmailLog "Not sent. $message"; return }
     [System.Windows.Forms.MessageBox]::Show($message, "School Dashboard") | Out-Null
+}
+
+function Close-Splash($form) {
+    if ($form) { $form.Close() }
 }
 
 # A small "Starting..." box so you know something is happening while the server starts.
 function Show-Splash($text) {
+    if ($Quiet) { return $null }
     $form = New-Object System.Windows.Forms.Form
     $form.Text = "School Dashboard"
     $form.Size = New-Object System.Drawing.Size(360, 130)
@@ -50,14 +77,8 @@ function Show-Splash($text) {
     return $form
 }
 
-# Installed with School-Dashboard-Setup.exe: the app comes prebuilt with its own Node.js.
-$Node      = Join-Path $Project "node\node.exe"
-$ServerJs  = Join-Path $Project "app\server.js"
-$Installed = (Test-Path $Node) -and (Test-Path $ServerJs)
-
 if ($Installed -and -not (Test-Running)) {
     # Personal files live in AppData so updating or uninstalling the app never touches them.
-    $DataDir = Join-Path $env:APPDATA "School Dashboard"
     New-Item -ItemType Directory -Force $DataDir | Out-Null
     $Log = Join-Path $DataDir "server.log"
     $splash = Show-Splash "Starting the dashboard..."
@@ -73,19 +94,20 @@ if ($Installed -and -not (Test-Running)) {
         -WorkingDirectory (Split-Path $ServerJs) `
         -WindowStyle Hidden `
         -PassThru
+        $started = $server
 
     $deadline = (Get-Date).AddSeconds(60)
     while (-not (Test-Running)) {
         [System.Windows.Forms.Application]::DoEvents()
         if ($server.HasExited -or (Get-Date) -gt $deadline) {
-            $splash.Close()
+            Close-Splash $splash
             if (-not $server.HasExited) { & taskkill /PID $server.Id /T /F | Out-Null }
             Show-Error "The dashboard didn't start. Details are in:`n$Log"
             exit 1
         }
         Start-Sleep -Milliseconds 300
     }
-    $splash.Close()
+    Close-Splash $splash
 }
 
 # Running from the project folder (Install.cmd or a git clone): build if needed, then start.
@@ -120,23 +142,46 @@ if (-not $Installed -and -not (Test-Running)) {
     # Tells the server to stop itself once its window is closed (see lib/autoStop.js).
     $env:DASHBOARD_AUTO_STOP = "1"
     $server = Start-Process -FilePath "cmd.exe" `
-        -ArgumentList "/c $command > `"$Log`" 2>&1" `
+        -ArgumentList "/c ($command) > `"$Log`" 2>&1" `
         -WorkingDirectory $Project `
         -WindowStyle Hidden `
         -PassThru
+        $started = $server
 
     $deadline = (Get-Date).AddSeconds($waitSeconds)
     while (-not (Test-Running)) {
         [System.Windows.Forms.Application]::DoEvents()
         if ($server.HasExited -or (Get-Date) -gt $deadline) {
-            $splash.Close()
+            Close-Splash $splash
             if (-not $server.HasExited) { & taskkill /PID $server.Id /T /F | Out-Null }
             Show-Error "The dashboard didn't start. Details are in:`n$Log"
             exit 1
         }
         Start-Sleep -Milliseconds 300
     }
-    $splash.Close()
+    Close-Splash $splash
+}
+
+if ($SendDigest) {
+    # The Origin header marks this as the dashboard's own request (see lib/sameOrigin.js).
+    $origin = "http://127.0.0.1:$Port"
+    try {
+        $res = Invoke-WebRequest -Method Post -Uri "$origin/api/digest" -Headers @{ Origin = $origin } `
+            -UseBasicParsing -TimeoutSec 120
+        $data = $res.Content | ConvertFrom-Json
+        Write-EmailLog "Sent to $($data.to)."
+    } catch {
+        # Windows PowerShell hides the response on errors; read the app's own message from it.
+        $detail = $null
+        try {
+            $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+            $detail = ($reader.ReadToEnd() | ConvertFrom-Json).error
+        } catch {}
+        Write-EmailLog "Not sent. $(if ($detail) { $detail } else { $_.Exception.Message })"
+    }
+    # Only stop a server this run started, never a dashboard you have open.
+    if ($started -and -not $started.HasExited) { & taskkill /PID $started.Id /T /F | Out-Null }
+    exit 0
 }
 
 # Open it. Prefers Chrome, then Edge, in app mode; falls back to your default browser.

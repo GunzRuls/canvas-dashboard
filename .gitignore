@@ -40,6 +40,7 @@ dashboard-config.json
 dashboard-settings.json
 dashboard-dismissed.json
 launcher/server.log
+launcher/email.log
 
 # vercel
 .vercel
