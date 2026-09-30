@@ -480,7 +480,6 @@ function ClassesList({ tour, send, connected, back, skip, onSaved }) {
   const [error, setError] = useState("");
   const [checked, setChecked] = useState(false); // show problems only after a save try
   const [busy, setBusy] = useState(false);
-  const [showHidden, setShowHidden] = useState(false);
   const headingRef = useRef(null);
 
   const load = () =>
@@ -603,10 +602,17 @@ function ClassesList({ tour, send, connected, back, skip, onSaved }) {
           </>
         )}
 
+        {rows && rows.length > 0 && (
+          <p className="mt-4 text-xs" style={{ color: MUTED }}>
+            Switch off anything that isn&apos;t a class (like Career Services). It won&apos;t show on your dashboard.
+          </p>
+        )}
         {rows && (
-          <ul className="mt-4">
-            {classes.map((r, i) => {
-              const above = classes[i - 1];
+          <ul className="mt-2">
+            {rows.map((r, i) => {
+              // "Same as above" copies the nearest shown class above this one.
+              const above = rows.slice(0, i).findLast((x) => !x.hidden);
+              const shown = !r.hidden;
               return (
                 <li
                   key={r.id}
@@ -615,14 +621,20 @@ function ClassesList({ tour, send, connected, back, skip, onSaved }) {
                 >
                   <ClassTimesRow
                     name={r.name}
-                    sub={r.code && r.code !== r.name ? r.code : ""}
+                    sub={[r.code && r.code !== r.name ? r.code : "", shown ? "" : "hidden"].filter(Boolean).join(" · ")}
                     color={r.color}
+                    dim={!shown}
+                    noTimes={!shown}
                     value={r.times}
                     onChange={(times) => update(r.id, { times })}
-                    problem={checked ? timesProblem(r.times) : ""}
+                    problem={checked && shown ? timesProblem(r.times) : ""}
                     below={
-                      <div className="mt-0.5 flex flex-wrap gap-x-3" style={{ color: MUTED }}>
-                        {above && !isBlank(above.times) && !timesProblem(above.times) && isBlank(r.times) && (
+                      shown &&
+                      above &&
+                      !isBlank(above.times) &&
+                      !timesProblem(above.times) &&
+                      isBlank(r.times) && (
+                        <div className="mt-0.5 flex flex-wrap gap-x-3" style={{ color: MUTED }}>
                           <button
                             type="button"
                             onClick={() => update(r.id, { times: { ...above.times, days: [...above.times.days] } })}
@@ -631,59 +643,31 @@ function ClassesList({ tour, send, connected, back, skip, onSaved }) {
                           >
                             Same as above
                           </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => update(r.id, { hidden: true })}
-                          className={link}
-                          aria-label={`${r.name} isn't a class. Hide it`}
-                        >
-                          Not a class
-                        </button>
-                      </div>
+                        </div>
+                      )
+                    }
+                    actions={
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={shown}
+                        aria-label={`Show ${r.name}`}
+                        onClick={() => update(r.id, { hidden: shown })}
+                        className="modal-switch flex-none"
+                      >
+                        <span className="modal-knob" />
+                      </button>
                     }
                   />
                 </li>
               );
             })}
-            {!classes.length && (
+            {!rows.length && (
               <li className="py-3 text-sm" style={{ color: MUTED }}>
                 No classes to set up.
               </li>
             )}
           </ul>
-        )}
-
-        {notClasses.length > 0 && (
-          <div className="mt-3 rounded-xl px-4 py-3" style={{ background: "var(--surface-2)" }}>
-            <button
-              type="button"
-              onClick={() => setShowHidden(!showHidden)}
-              aria-expanded={showHidden}
-              className="text-sm font-bold hover:underline"
-              style={{ color: "var(--ink-soft)" }}
-            >
-              <span aria-hidden="true">{showHidden ? "▾" : "▸"}</span> Hidden ({notClasses.length})
-            </button>
-            {showHidden && (
-              <ul className="mt-2 flex flex-col gap-1.5">
-                {notClasses.map((r) => (
-                  <li key={r.id} className="flex items-center gap-2.5 text-sm" style={{ "--c": r.color, color: INK }}>
-                    <span className="c-dot h-2.5 w-2.5 flex-none rounded-full" aria-hidden="true" />
-                    <span className="min-w-0 flex-1 truncate">{r.name}</span>
-                    <button
-                      type="button"
-                      onClick={() => update(r.id, { hidden: false })}
-                      className="btn btn-secondary flex-none rounded-md px-2.5 py-1 text-xs"
-                      aria-label={`${r.name} is a class. Show it`}
-                    >
-                      It&apos;s a class
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
         )}
 
         <ErrorNote text={error} />
