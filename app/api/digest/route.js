@@ -5,8 +5,8 @@ import { fromThisApp } from "@/lib/sameOrigin";
 
 async function run() {
   if (!digestEnabled()) throw new Error("Turn on the morning email in Settings first.");
-  const { courses, items, announcements } = await loadDashboard({ withCalendar: false, withAttendance: false, withGrades: false });
-  await sendDigest(buildDigest({ courses, items, announcements }));
+  const { courses, items, announcements, account } = await loadDashboard({ withCalendar: false, withAttendance: false, withGrades: false });
+  await sendDigest(buildDigest({ courses, items, announcements, account }));
   return Response.json({ ok: true, to: getConfig().digestToEmail });
 }
 

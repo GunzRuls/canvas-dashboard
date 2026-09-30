@@ -3,7 +3,7 @@
 // Run with: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildDigestHtml, escapeHtml } from "../lib/digestHtml.js";
+import { buildDigestHtml, escapeHtml, firstNameOf } from "../lib/digestHtml.js";
 
 const TZ = "America/New_York";
 const NOW = Date.parse("2026-09-30T11:00:00Z"); // 7:00 AM EDT
@@ -202,4 +202,143 @@ test("brochure: quiet day, escaping, and no button without a Canvas address", ()
     { style: "brochure", canvasUrl: "" }
   );
   assert.doesNotMatch(html, /<script>|<b>Class|javascript:|Open Canvas/);
+});
+
+// ---- Note style ("Good morning, Joel.") ----
+
+const note = (data, options = {}) => build(data, { style: "note", ...options });
+// The summary paragraph as plain text (tags stripped, entities kept).
+const lede = (html) => html.match(/<p class="em-body em-lede"[^>]*>([\s\S]*?)<\/p>/)[1].replace(/<[^>]+>/g, "");
+const sentences = (text) => text.split(/(?<=\.) (?=[A-Z0-9])/);
+
+test("note: today sentence has 0 / 1 / many variants", () => {
+  assert.equal(lede(note({}).html), "Nothing is due today. Nothing is due this week. Nothing is overdue.");
+  assert.equal(
+    lede(note({ items: [item("Quiz 2", at(9))] }).html),
+    "You have 1 thing due today: Quiz 2 at 4:00 PM. Nothing else is due this week. Nothing is overdue."
+  );
+  const three = lede(note({ items: [item("C", at(12)), item("A", at(3)), item("B", at(9))] }).html);
+  assert.match(three, /^You have 3 things due today, starting with A at 10:00 AM\./);
+});
+
+test("note: next-up sentence says tomorrow or the weekday", () => {
+  const monday = lede(note({ items: [item("Quiz 2", at(9)), item("Team Contract", at(5 * 24 + 10), { courseId: 2 })] }).html);
+  assert.match(monday, /Next up is Team Contract on Monday\./);
+  const tomorrow = lede(note({ items: [item("Reading", at(26)), item("Team Contract", at(5 * 24))] }).html);
+  assert.match(tomorrow, /^Nothing is due today\. Next up is Reading tomorrow\./);
+});
+
+test("note: overdue sentence has 0 / 1 / many variants, max three sentences", () => {
+  assert.match(lede(note({ items: [item("Quiz 2", at(9))] }).html), / Nothing is overdue\.$/);
+  assert.match(lede(note({ items: [item("Late", at(-5))] }).html), / 1 thing is overdue\.$/);
+  assert.match(lede(note({ items: [item("A", at(-5)), item("B", at(-50))] }).html), / 2 things are overdue\.$/);
+  for (const data of [{}, { items: [item("A", at(-5)), item("B", at(3)), item("C", at(4)), item("D", at(30))] }]) {
+    assert.equal(sentences(lede(note(data).html)).length, 3);
+  }
+});
+
+test("note: long titles are shortened in the summary chip, not in the list", () => {
+  const long = "Quiz 2- Requires Respondus LockDown Browser for the whole class";
+  const { html } = note({ items: [item(long, at(9))] });
+  const chip = lede(html).match(/today: (.*) at /)[1];
+  assert.ok(chip.length <= 40, chip);
+  assert.ok(chip.endsWith("…"));
+  assert.match(html, new RegExp(`>${long}<`));
+});
+
+test("note: first name greeting is optional and escaped", () => {
+  assert.match(note({}, { firstName: "Joel" }).html, />Good morning, Joel\.</);
+  assert.match(note({}).html, />Good morning\.</);
+  assert.match(note({}, { firstName: "  " }).html, />Good morning\.</);
+  const evil = note({}, { firstName: `<img src=x onerror=alert(1)>` }).html;
+  assert.doesNotMatch(evil, /<img/);
+  assert.match(evil, /Good morning, &lt;img src=x onerror=alert\(1\)&gt;\./);
+  assert.equal(firstNameOf({ shortName: "Joel Figueroa", name: "Joel A. Figueroa" }), "Joel");
+  assert.equal(firstNameOf({ name: "Jo Smith" }), "Jo");
+  assert.equal(firstNameOf(null), "");
+  assert.equal(firstNameOf({ shortName: "" }), "");
+});
+
+test("note: plate lists overdue, today, then the week, each once; empty state", () => {
+  const { html } = note({
+    items: [item("Team", at(5 * 24)), item("Quiz 2", at(9)), item("Reading", at(26)), item("Late lab", at(-30))],
+  });
+  const plate = html.slice(html.indexOf(">On your plate<"));
+  const titles = ["Late lab", "Quiz 2", "Reading", "Team"];
+  const order = titles.map((t) => plate.indexOf(`>${t}<`));
+  assert.ok(order.every((i) => i > 0));
+  assert.deepEqual([...order].sort((a, b) => a - b), order);
+  for (const t of titles) assert.equal(plate.split(`>${t}<`).length, 2, t);
+  for (const label of ["Overdue", "Today", "Tomorrow", "Mon, Oct 5", "Tue, Sep 29"]) assert.match(plate, new RegExp(`>${label}<`));
+  assert.doesNotMatch(html, /Nothing due this week/);
+  assert.match(note({}).html, />Nothing due this week\.</);
+  // the same item passed twice still shows once
+  const twice = item("Twice", at(9), { id: 7 });
+  const dup = note({ items: [twice, { ...twice }] }).html;
+  assert.equal(dup.slice(dup.indexOf(">On your plate<")).split(">Twice<").length, 2);
+});
+
+test("note: newest announcement is the pull quote; the rest are rows", () => {
+  const { html } = note({
+    courses: [...courses, { id: 3, name: "Algorithm Design & Analysis", code: "COP 4531", color: "#13A3B5" }],
+    announcements: [
+      { courseId: 1, title: "Older one", postedAt: at(-10), preview: "old", read: false, url: `${CANVAS}/b` },
+      { courseId: 3, title: "Midterm Exam", postedAt: at(-2), preview: "x".repeat(400), read: false, url: `${CANVAS}/a` },
+      { courseId: 2, title: "Too old", postedAt: at(-40), preview: "", read: false },
+    ],
+  });
+  assert.match(html, /&#8220;/);
+  assert.ok(html.indexOf(">Midterm Exam<") < html.indexOf(">Also new<"));
+  assert.ok(html.indexOf(">Also new<") < html.indexOf(">Older one<"));
+  assert.match(html, />Algorithm Design &amp; Analysis · COP 4531</);
+  assert.match(html, new RegExp(`>${"x".repeat(219)}…<`));
+  assert.doesNotMatch(html, new RegExp("x".repeat(220)));
+  assert.doesNotMatch(html, /Too old/);
+  const single = note({ announcements: [{ courseId: 1, title: "Only", postedAt: at(-1), preview: "Hi", read: false }] }).html;
+  assert.match(single, />Only</);
+  assert.doesNotMatch(single, /Also new/);
+  assert.doesNotMatch(note({}).html, /&#8220;/);
+});
+
+test("note: one Open Canvas link, Outlook-safe fills, dark hooks, no heavy weights", () => {
+  const data = {
+    items: [item("Late lab", at(-30)), item("Quiz 2", at(9)), item("Team", at(5 * 24), { courseId: 2 })],
+    announcements: [{ courseId: 2, title: "Exam moved", postedAt: at(-3), preview: "See you", read: false }],
+  };
+  const { html, subject, preheader } = note(data, { firstName: "Joel" });
+  assert.equal(html.match(/Open Canvas/g).length, 1);
+  assert.match(html, /href="https:\/\/school\.instructure\.com\/"[^>]*>Open Canvas/);
+  assert.doesNotMatch(note({}, { canvasUrl: "" }).html, /Open Canvas/);
+  assert.doesNotMatch(html, /font-weight:(800|900)/);
+  assert.match(html, /font-family:'Bricolage Grotesque','Segoe UI'/);
+  assert.match(html, /max-width:720px/);
+  const body = html.slice(html.indexOf("<body"));
+  assert.doesNotMatch(body.match(/<body[^>]*>/)[0], /bgcolor|background/);
+  // Only the dark-ink button and the tiny logo bars are filled; chips and the quote are not.
+  const fills = new Set([...body.matchAll(/background-color:(#[0-9A-Fa-f]{6})/g)].map((m) => m[1].toUpperCase()));
+  const allowed = new Set(["#1B1A2E", "#EF4F8C", "#2F6BFF", "#7C5CFA", "#6DBE2E", "#13A3B5", "#FF7A2F"]);
+  for (const f of fills) assert.ok(allowed.has(f), `unexpected fill ${f}`);
+  for (const tag of body.match(/<[a-z0-9]+ [^>]*style="[^"]*(?:^|[;"\s])(?:color|background-color):[^>]*>/g)) {
+    if (!/display:none/.test(tag)) assert.match(tag, /class="[^"]*em-/, tag.slice(0, 120));
+  }
+  // Apple Mail flips the button light; Outlook web keeps it dark with a light outline.
+  assert.match(html, /@media \(prefers-color-scheme: dark\)[\s\S]*\.em-cta \{ background-color:#F2F0FA !important; \}/);
+  assert.match(html, /\[data-ogsc\] \.em-b-cta \{ border-color:#F2F0FA !important; \}/);
+  assert.doesNotMatch(html, /\[data-ogsb\] \.em-cta/);
+  // chips keep their class color in dark mode, even though they are links
+  assert.match(html, /a\.em-t-FF7A2F \{ color:#FFB085 !important; \}/);
+  // same subject and preheader as the other styles
+  const banner = build(data);
+  assert.equal(subject, banner.subject);
+  assert.equal(preheader, banner.preheader);
+});
+
+test("note: Canvas text is escaped everywhere", () => {
+  const evil = `<script>alert("x")</script>`;
+  const { html } = note({
+    courses: [{ id: 1, name: `<b>Class</b>`, code: `<i>X</i>`, color: "#FF7A2F" }],
+    items: [item(evil, at(3), { url: "javascript:alert(1)" }), item(evil, at(30))],
+    announcements: [{ courseId: 1, title: evil, postedAt: at(-1), preview: evil, read: false }],
+  });
+  assert.doesNotMatch(html, /<script>|<b>Class|<i>X|javascript:/);
 });
