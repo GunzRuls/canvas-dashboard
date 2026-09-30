@@ -69,10 +69,30 @@ function timeAgo(iso, now) {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+// Soonest due first. Items with no due date go last.
 function byDueDate(a, b) {
-  if (!a.dueAt) return 1;
-  if (!b.dueAt) return -1;
+  if (!a.dueAt || !b.dueAt) return (a.dueAt ? 0 : 1) - (b.dueAt ? 0 : 1);
   return new Date(a.dueAt) - new Date(b.dueAt);
+}
+
+// The "week radar": due in the next 7 days (or already overdue), the same window as the
+// "due this week" counter. Everything later, or with no due date, goes under "Later".
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+function dueThisWeekOrOverdue(item, now) {
+  return Boolean(item.dueAt) && new Date(item.dueAt).getTime() <= now + WEEK_MS;
+}
+
+// Done only keeps work until 5 days after its due date. It's still in Canvas after that.
+const DONE_KEEP_DAYS = 5;
+function stillShownInDone(item, now) {
+  if (!item.dueAt) return true;
+  return now - new Date(item.dueAt).getTime() < DONE_KEEP_DAYS * 24 * 60 * 60 * 1000;
+}
+
+// Done shows the most recent first, so something you just turned in is at the top.
+function byDueDateNewest(a, b) {
+  if (!a.dueAt || !b.dueAt) return (a.dueAt ? 0 : 1) - (b.dueAt ? 0 : 1);
+  return new Date(b.dueAt) - new Date(a.dueAt);
 }
 
 // Where a card starts: Canvas's "marked complete" wins, then submission status.
@@ -95,6 +115,7 @@ export default function Dashboard({
   digestEnabled = false,
   newGrades = [],
   sessions = [],
+  loadedAt,
 }) {
   const router = useRouter();
   const [isRefreshing, startRefresh] = useTransition();
@@ -119,6 +140,27 @@ export default function Dashboard({
   const [theme, setTheme] = useState(null); // "light" | "dark", read after load
 
   const refresh = () => startRefresh(() => router.refresh());
+
+  // Keep Canvas data fresh without clicking Refresh: every 15 minutes while open, and when you
+  // come back to the window after 3 or more minutes away.
+  useEffect(() => {
+    let loadedAt = Date.now();
+    const reload = () => {
+      loadedAt = Date.now();
+      startRefresh(() => router.refresh());
+    };
+    const onReturn = () => {
+      if (document.visibilityState === "visible" && Date.now() - loadedAt > 3 * 60 * 1000) reload();
+    };
+    const timer = setInterval(() => document.visibilityState === "visible" && reload(), 15 * 60 * 1000);
+    document.addEventListener("visibilitychange", onReturn);
+    window.addEventListener("focus", onReturn);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onReturn);
+      window.removeEventListener("focus", onReturn);
+    };
+  }, [router]);
 
   // When the server sends fresh data (after Refresh), rebuild the board from it.
   useEffect(() => {
@@ -511,7 +553,12 @@ export default function Dashboard({
           />
           <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 md:grid-cols-3 xl:grid-rows-1">
             {COLUMNS.map((col) => {
-              const cards = visibleItems.filter((i) => status[i.key] === col.id).sort(byDueDate);
+              // `now` is set after the page loads; until then use the server's load time so
+              // the first draw matches and old Done cards never flash in.
+              const cards = visibleItems
+                .filter((i) => status[i.key] === col.id)
+                .filter((i) => col.id !== "done" || stillShownInDone(i, now ?? loadedAt))
+                .sort(col.id === "done" ? byDueDateNewest : byDueDate);
               return (
                 <BoardColumn
                   key={col.id}
@@ -533,7 +580,15 @@ export default function Dashboard({
                 >
                   <CardList
                     cards={cards}
-                    collapseAfter={col.id === "done" ? 8 : null}
+                    collapseAfter={8}
+                    splitAt={
+                      col.id === "done"
+                        ? undefined
+                        : (() => {
+                            const i = cards.findIndex((c) => !dueThisWeekOrOverdue(c, now ?? loadedAt));
+                            return i === -1 ? cards.length : i;
+                          })()
+                    }
                     renderCard={(item) => (
                       <TaskCard
                         key={item.key}
@@ -625,9 +680,10 @@ export default function Dashboard({
       )}
 
       {toast && (
+        // Bottom-center: the corners hold the announcements' Done buttons and other controls.
         <div
           role="status"
-          className="fixed bottom-5 right-5 z-[60] flex max-w-sm items-center rounded-xl px-4 py-3 text-sm font-semibold shadow-lg"
+          className="fixed bottom-5 left-1/2 z-[60] flex w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-xl py-2.5 pl-4 pr-2 text-sm font-semibold shadow-lg"
           style={
             toast.tone === "error"
               ? { background: "var(--red-fg)", color: "var(--bg)" }
@@ -638,12 +694,19 @@ export default function Dashboard({
           {toast.action && (
             <button
               onClick={toast.action.onClick}
-              className="ml-3 rounded-md px-2 py-0.5 font-bold"
+              className="rounded-md px-2 py-0.5 font-bold"
               style={{ background: "color-mix(in srgb, currentColor 18%, transparent)" }}
             >
               {toast.action.label}
             </button>
           )}
+          <button
+            onClick={() => setToast(null)}
+            aria-label="Close"
+            className="rounded-md px-1.5 text-base leading-none opacity-70 hover:opacity-100"
+          >
+            ×
+          </button>
         </div>
       )}
     </main>
@@ -895,7 +958,9 @@ function BoardColumn({ column, count, isDropTarget, children, ...dropHandlers })
   );
 }
 
-function CardList({ cards, collapseAfter, renderCard, emptyText }) {
+// `splitAt` (board columns only): cards before this index are due this week, the rest are
+// "Later". This week's cards are never hidden behind "Show more"; only Later folds up.
+function CardList({ cards, collapseAfter, renderCard, emptyText, splitAt }) {
   const [expanded, setExpanded] = useState(false);
   if (cards.length === 0 && emptyText) {
     return (
@@ -904,19 +969,50 @@ function CardList({ cards, collapseAfter, renderCard, emptyText }) {
       </p>
     );
   }
-  const limit = collapseAfter && !expanded ? collapseAfter : cards.length;
+  const split = splitAt ?? 0;
+  const collapsedLimit = collapseAfter ? Math.max(collapseAfter, split) : cards.length;
+  const limit = expanded ? cards.length : collapsedLimit;
+  const canCollapse = collapseAfter && cards.length > collapsedLimit;
+  const hasSections = splitAt !== undefined;
   return (
     <div className="flex flex-col gap-2">
-      {cards.slice(0, limit).map(renderCard)}
-      {cards.length > limit && (
+      {hasSections ? (
+        <>
+          <SectionLabel label="This week" count={split} accent />
+          {split === 0 && (
+            <p className="px-1 pb-1 text-xs" style={{ color: MUTED }}>
+              Nothing due in the next 7 days.
+            </p>
+          )}
+          {cards.slice(0, Math.min(limit, split)).map(renderCard)}
+          {split < cards.length && <SectionLabel label="Later" count={cards.length - split} />}
+          {cards.slice(split, limit).map(renderCard)}
+        </>
+      ) : (
+        cards.slice(0, limit).map(renderCard)
+      )}
+      {canCollapse && (
         <button
-          onClick={() => setExpanded(true)}
+          onClick={() => setExpanded(!expanded)}
           className="rounded-lg py-1.5 text-sm font-semibold hover:bg-[var(--surface)]"
           style={{ color: INK }}
         >
-          Show {cards.length - limit} more
+          {expanded ? "Show fewer" : `Show ${cards.length - limit} more`}
         </button>
       )}
+    </div>
+  );
+}
+
+function SectionLabel({ label, count, accent }) {
+  return (
+    <div
+      className="flex items-center gap-2 px-1 pt-1 text-[11px] font-bold uppercase tracking-wide"
+      style={{ color: accent ? "var(--blue-fg)" : MUTED }}
+    >
+      <span>{label}</span>
+      <span className="h-px flex-1" style={{ background: "var(--line)" }} />
+      <span>{count}</span>
     </div>
   );
 }

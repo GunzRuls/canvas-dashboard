@@ -46,6 +46,11 @@ The token only ever lives on the server. Pattern: browser → our API routes / s
 
 ## Behavior decisions (keep these)
 
+- Board order: To do and In progress soonest-due first; Done most-recently-due first (just-submitted work on top). Done hides cards 5 days after their due date (`DONE_KEEP_DAYS`; no-date items stay), using `now ?? loadedAt` (server load time passed from page.js) so the first client render matches the server. The toast sits bottom-center with a close button (the corners hold Done buttons). Every board column shows 8 cards, then "Show X more" / "Show fewer" (`CardList`); announcements collapse after 12. Keep columns consistent with each other.
+- Week radar: To do and In progress split into "This week" (due within 7 days of now, or overdue; same window as the "due this week" counter, blue label) and "Later" (plus no-date items). `CardList` `splitAt` never hides This week behind "Show more"; only Later collapses. Done has no split.
+- Freshness: the dashboard calls `router.refresh()` every 15 min while visible and when the window regains focus after 3+ min away.
+- Links inside draggable cards have `-webkit-user-drag: none` (globals.css) so grabbing a card by its title drags the card, not the URL.
+- Tests: `npm test` runs `tests/*.test.mjs` (node:test, no dependencies) with hand-computed expected values for `lib/gradeMath.js`. The release workflow runs them before building, so a failing test blocks the installer. Add a test when changing grade math.
 - Board columns: To do / In progress / Done. Only moves into or out of Done touch Canvas (planner override). "In progress" is local only (localStorage key `dashboard-in-progress`). Initial status: override wins, then `submissions.submitted` means Done.
 - Class names, not course codes, are shown everywhere; codes appear only as small secondary labels.
 - Layout is one screen on desktop (xl): top bar, 7-day strip, then grades sidebar | board | announcements, each panel scrolling on its own. The user disliked long vertical pages.

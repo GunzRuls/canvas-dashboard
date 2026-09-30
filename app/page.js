@@ -54,6 +54,7 @@ export default async function Home() {
       digestEnabled={digestEnabled()}
       newGrades={data.newGrades}
       sessions={data.sessions}
+      loadedAt={Date.now()}
     />
   );
 }

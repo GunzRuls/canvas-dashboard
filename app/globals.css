@@ -163,6 +163,14 @@ textarea::placeholder {
   }
 }
 
+/* Dragging a board card by its title (a link) would otherwise drag the web address instead of
+   the card. Links inside draggable cards can't be dragged on their own, so the whole card moves. */
+[draggable="true"] a,
+[draggable="true"] img {
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
 @keyframes live-dot {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }

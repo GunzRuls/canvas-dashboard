@@ -24,6 +24,10 @@ jobs:
 
       - run: npm ci
 
+      # If any grade-math test fails, stop here so no installer gets built.
+      - name: Run the tests
+        run: npm test
+
       # The release tag (v1.2.0 -> 1.2.0) becomes the app's version. Manual test runs get
       # 0.0.0-dev, which never counts as newer than a real release.
       - name: Work out the version
