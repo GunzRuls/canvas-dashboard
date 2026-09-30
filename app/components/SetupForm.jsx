@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Input, CanvasAddressHelp, TokenHelp, GmailHelp, ResendHelp } from "./setupHelp";
 import { LinkedCalendars, CanvasFeed } from "./CalendarSettings";
 import { Avatar } from "./AccountChip";
+import { useSettingsModal, SettingsModalHeader } from "./SettingsModal";
 
 const INK = "var(--ink)";
 const MUTED = "var(--muted)";
@@ -41,6 +42,7 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
   const [error, setError] = useState("");
   const [savedNote, setSavedNote] = useState(""); // "Saved" next to the button, fades after a moment
   const router = useRouter();
+  const modal = useSettingsModal(); // set when shown as the pop-up over the dashboard
 
   useEffect(() => {
     if (!savedNote) return;
@@ -107,7 +109,9 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
       setGmailAppPassword("");
       setResendApiKey("");
       setClear([]);
-      if (fixToken) router.replace("/setup");
+      // In the pop-up, the refresh also reloads the dashboard behind it (and again on Close).
+      modal?.markSaved();
+      if (fixToken && !modal) router.replace("/setup");
       else router.refresh();
       return data;
     } catch (err) {
@@ -149,27 +153,8 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
     setTesting(false);
   }
 
-  return (
-    <main className="mx-auto max-w-xl px-4 pb-10">
-      {/* Stays at the top while you scroll, so there's always a clear way back. */}
-      <div className="sticky top-0 z-10 -mx-4 mb-4 px-4 pb-3 pt-4" style={{ background: "var(--bg)" }}>
-        {firstRun ? (
-          <div className="h-8" />
-        ) : (
-          <a
-            href="/"
-            className="btn btn-secondary h-10 px-3.5 text-sm"
-          >
-            <span aria-hidden="true">←</span> Back to dashboard
-          </a>
-        )}
-      </div>
-      <h1 className="font-display text-3xl font-extrabold tracking-tight" style={{ color: INK }}>
-        {firstRun ? "Welcome! Let's connect Canvas" : "Settings"}
-      </h1>
-      <p className="mt-2 text-sm" style={{ color: MUTED }}>
-        Everything you enter is saved only on this computer. Your token is only ever sent to Canvas.
-      </p>
+  const content = (
+    <>
       {fixToken && (
         <p className="mt-4 rounded-xl px-4 py-3 text-sm font-semibold" style={{ background: "var(--amber-bg)", color: "var(--amber-fg)" }}>
           Your Canvas token stopped working. Follow the steps under Access token to make a new one, paste it, and
@@ -177,7 +162,7 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
         </p>
       )}
 
-      <form onSubmit={submit} className="mt-6 flex flex-col gap-4">
+      <form onSubmit={submit} className={`${modal ? "mt-2" : "mt-6"} flex flex-col gap-4`}>
         <Section title="Canvas" note="Required">
           {account && (
             <div className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ background: "var(--surface-2)" }}>
@@ -415,6 +400,41 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
       </form>
 
       {!firstRun && <Maintenance installed={installed} version={version} />}
+    </>
+  );
+
+  // Pop-up over the dashboard: a fixed title row with Close, and the settings scroll below it.
+  if (modal) {
+    return (
+      <>
+        <SettingsModalHeader />
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-2 sm:px-6">{content}</div>
+      </>
+    );
+  }
+
+  return (
+    <main className="mx-auto max-w-xl px-4 pb-10">
+      {/* Stays at the top while you scroll, so there's always a clear way back. */}
+      <div className="sticky top-0 z-10 -mx-4 mb-4 px-4 pb-3 pt-4" style={{ background: "var(--bg)" }}>
+        {firstRun ? (
+          <div className="h-8" />
+        ) : (
+          <a
+            href="/"
+            className="btn btn-secondary h-10 px-3.5 text-sm"
+          >
+            <span aria-hidden="true">←</span> Back to dashboard
+          </a>
+        )}
+      </div>
+      <h1 className="font-display text-3xl font-extrabold tracking-tight" style={{ color: INK }}>
+        {firstRun ? "Welcome! Let's connect Canvas" : "Settings"}
+      </h1>
+      <p className="mt-2 text-sm" style={{ color: MUTED }}>
+        Everything you enter is saved only on this computer. Your token is only ever sent to Canvas.
+      </p>
+      {content}
     </main>
   );
 }

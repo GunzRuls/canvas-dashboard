@@ -397,7 +397,13 @@ details[open] > .fold-summary .fold-chevron {
   from { opacity: 0; transform: translate(-50%, -40%) scale(0.94); }
   to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
-.redirect-bar { transform-origin: left; animation: redirect-bar 0.8s linear both; } /* = OPEN_MS in RedirectCard.jsx */
+.redirect-bar { transform-origin: left; animation: redirect-bar 1.4s cubic-bezier(0.3, 0, 0.6, 1) both; } /* = OPEN_MS in RedirectCard.jsx */
 @keyframes redirect-bar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 .redirect-nudge { animation: redirect-nudge 0.7s ease-in-out infinite; }
 @keyframes redirect-nudge { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(3px, -3px); } }
+
+/* Settings pop-up (SettingsModal.jsx): placeholder boxes that gently pulse for the moment the
+   settings take to load, inside the pop-up or the full /setup page. The reduced-motion rule
+   above stops the pulse. */
+@keyframes settings-skeleton { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+.settings-skeleton { animation: settings-skeleton 1.4s ease-in-out infinite; }

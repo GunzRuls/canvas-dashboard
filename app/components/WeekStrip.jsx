@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 const INK = "var(--ink)";
 const MUTED = "var(--muted)";
 const HEAVY_DAY = 3; // this many things due in one day gets flagged
@@ -124,17 +126,17 @@ export default function WeekStrip({ items, status, events, calendarEnabled, hidd
       {!calendarEnabled ? (
         <p className="mt-1 text-xs" style={{ color: MUTED }}>
           Add your Google or Outlook calendar in{" "}
-          <a href="/setup" className="text-link font-bold underline">
+          <Link href="/setup" scroll={false} className="text-link font-bold underline">
             Settings
-          </a>{" "}
+          </Link>{" "}
           to see class events here.
         </p>
       ) : hiddenCount > 0 ? (
         <p className="mt-1 text-xs" style={{ color: MUTED }}>
           {hiddenCount} personal event{hiddenCount === 1 ? "" : "s"} hidden.{" "}
-          <a href="/setup" className="text-link font-bold underline">
+          <Link href="/setup" scroll={false} className="text-link font-bold underline">
             Show them
-          </a>
+          </Link>
         </p>
       ) : null}
     </div>

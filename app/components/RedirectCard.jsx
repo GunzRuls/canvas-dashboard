@@ -9,8 +9,8 @@ import { useEffect, useRef, useState } from "react";
 // card first and opens the page when its bar fills (OPEN_MS; the user asked to see it). Ctrl/Shift/
 // middle clicks still open right away.
 
-const OPEN_MS = 800; // the bar fills in this time (.redirect-bar in globals.css), then the page opens
-const SHOW_MS = 1100; // the card stays a moment after the page opens, then fades
+const OPEN_MS = 1400; // the bar fills in this time (.redirect-bar in globals.css), then the page opens
+const SHOW_MS = OPEN_MS + 300; // the card stays a moment after the page opens, then fades
 const FADE_MS = 200;
 
 // Link texts that don't say anything on their own ("Open", "Grades"...).

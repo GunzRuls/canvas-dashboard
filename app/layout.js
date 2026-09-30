@@ -21,7 +21,9 @@ export const metadata = {
 // Applies your saved theme before the page draws, so there's no white flash in dark mode.
 const themeScript = `try{var t=localStorage.getItem("dashboard-theme");if(t)document.documentElement.dataset.theme=t}catch(e){}`;
 
-export default function RootLayout({ children }) {
+// `modal` is the app/@modal slot: the Settings pop-up when the dashboard's Settings button opened
+// it, otherwise nothing.
+export default function RootLayout({ children, modal }) {
   return (
     <html lang="en" className={`${bricolage.variable} ${figtree.variable} h-full antialiased`} suppressHydrationWarning>
       <head>
@@ -29,6 +31,7 @@ export default function RootLayout({ children }) {
       </head>
       <body className="min-h-full">
         {children}
+        {modal}
         <KeepAlive />
         <RedirectCard />
       </body>

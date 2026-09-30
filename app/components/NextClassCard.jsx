@@ -1,6 +1,7 @@
 "use client";
 
 import { nextClassCard } from "@/lib/nextClass";
+import { displayCode } from "@/lib/courseNames";
 
 const INK = "var(--ink)";
 const MUTED = "var(--muted)";
@@ -131,6 +132,7 @@ export default function NextClassCard({ now, courses, sessions, items, status, a
   const dayName = state === "tomorrow" ? (card.daysAway === 1 ? "Tomorrow" : WEEKDAYS[card.dayLabel]) : null;
   const progress = state === "now" ? Math.min(100, Math.max(0, ((now - start) / (end - start)) * 100)) : 0;
   const due = card.urgent ? dueLine(card.urgent, card, now) : null;
+  const code = displayCode(course);
 
   return (
     <section
@@ -174,7 +176,13 @@ export default function NextClassCard({ now, courses, sessions, items, status, a
             {course.name}
           </span>
         </a>
-        <p className="ml-[18px] mt-0.5 text-sm font-semibold" style={{ color: "var(--ink-soft)" }}>
+        <p className="ml-[18px] mt-0.5 text-sm font-semibold tabular-nums" style={{ color: "var(--ink-soft)" }}>
+          {code && (
+            <>
+              <span className="c-text font-bold">{code}</span>
+              {" · "}
+            </>
+          )}
           {dayName && state === "tomorrow" ? `${dayName.slice(0, 3)} · ` : ""}
           {timeText}
         </p>

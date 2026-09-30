@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import WeekStrip from "./WeekStrip";
 import QuickAdd from "./QuickAdd";
 import WhatIfPanel from "./WhatIfPanel";
@@ -9,6 +10,7 @@ import ManageClasses from "./ManageClasses";
 import UpdateNotice from "./UpdateNotice";
 import AccountChip from "./AccountChip";
 import NextClassCard from "./NextClassCard";
+import { displayCode } from "@/lib/courseNames";
 
 const INK = "var(--ink)";
 const MUTED = "var(--muted)";
@@ -225,6 +227,7 @@ export default function Dashboard({
   const courseById = useMemo(() => Object.fromEntries(courses.map((c) => [c.id, c])), [courses]);
   const colorFor = (courseId) => courseById[courseId]?.color || NEUTRAL_COLOR;
   const nameFor = (courseId, fallback) => courseById[courseId]?.name || fallback || "Personal";
+  const codeFor = (courseId) => displayCode(courseById[courseId]);
 
   const liveGrades = newGrades.filter((g) => !seenGradeKeys.has(g.key) && courseById[g.courseId]);
   const gradesByCourse = {};
@@ -472,7 +475,10 @@ export default function Dashboard({
             {theme === "dark" ? "Light mode" : "Dark mode"}
           </TopButton>
           <TopButton onClick={() => setManaging(true)}>Manage classes</TopButton>
-          <TopButton onClick={() => window.location.assign("/setup")}>Settings</TopButton>
+          {/* Opens Settings as a pop-up over the dashboard (app/@modal/(.)setup). */}
+          <Link href="/setup" scroll={false} className="btn btn-secondary h-10 px-3.5 text-sm">
+            Settings
+          </Link>
           <UpdateNotice />
           {digestEnabled && (
             <TopButton onClick={emailSummary} disabled={sendingDigest}>
@@ -610,6 +616,7 @@ export default function Dashboard({
                         now={now}
                         color={colorFor(item.courseId)}
                         courseName={nameFor(item.courseId, item.courseName)}
+                        courseCode={codeFor(item.courseId)}
                         readIds={readIds}
                         onOpenAnnouncement={markRead}
                         syncing={syncing.has(item.key)}
@@ -669,6 +676,7 @@ export default function Dashboard({
                     unread={!readIds.has(a.id)}
                     color={colorFor(a.courseId)}
                     courseName={nameFor(a.courseId)}
+                    courseCode={codeFor(a.courseId)}
                     onRead={() => markRead(a)}
                     onDone={() => dismissAnnouncements([a])}
                   />
@@ -831,8 +839,16 @@ function GradeRing({ course, active, dimmed, onSelect, onWhatIf, newGrades, onSe
               <path d="M3.5 2.5h6v6M9.5 2.5 2.5 9.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
           </a>
-          <p className="text-xs font-semibold" style={{ color: MUTED }}>
-            {score === null ? "No grade yet" : `${Number(score).toFixed(1)}%${course.grade ? ` · ${course.grade}` : ""}`}
+          <p className="text-xs font-semibold tabular-nums" style={{ color: MUTED }}>
+            {displayCode(course) && (
+              <>
+                <span className="c-text font-bold">{displayCode(course)}</span>
+                {" · "}
+              </>
+            )}
+            <span className="whitespace-nowrap">
+              {score === null ? "No grade yet" : `${Number(score).toFixed(1)}%${course.grade ? ` · ${course.grade}` : ""}`}
+            </span>
           </p>
         </div>
       </div>
@@ -1040,6 +1056,7 @@ function TaskCard({
   now,
   color,
   courseName,
+  courseCode,
   readIds,
   onOpenAnnouncement,
   syncing,
@@ -1071,9 +1088,10 @@ function TaskCard({
       className="task-card cursor-grab rounded-xl px-3 py-2.5 active:cursor-grabbing"
       style={{ "--c": color, opacity: dragging ? 0.4 : syncing ? 0.6 : 1 }}
     >
-      <p className="c-text flex items-center gap-1.5 text-xs font-bold" title={courseName}>
+      <p className="c-text flex items-center gap-1.5 text-xs font-bold" title={courseCode ? `${courseName} (${courseCode})` : courseName}>
         <span className="c-dot h-2 w-2 shrink-0 rounded-full" aria-hidden="true" />
         <span className="truncate">{courseName}</span>
+        <CourseCode code={courseCode} />
       </p>
 
       {item.url ? (
@@ -1165,13 +1183,24 @@ function MoveButton({ children, onClick, strong }) {
   );
 }
 
-function AnnouncementCard({ announcement: a, now, unread, color, courseName, onRead, onDone }) {
+// The small course code after a class label ("CEN 4065"); nothing when the class has no real code.
+function CourseCode({ code }) {
+  if (!code) return null;
+  return (
+    <span className="shrink-0 font-semibold tabular-nums" style={{ color: MUTED }}>
+      {code}
+    </span>
+  );
+}
+
+function AnnouncementCard({ announcement: a, now, unread, color, courseName, courseCode, onRead, onDone }) {
   return (
     <article className="row-hover px-4 py-3" style={{ "--c": color, opacity: unread ? 1 : 0.72 }}>
       <div className="flex items-center justify-between gap-2 text-xs">
-        <span className="c-text flex min-w-0 items-center gap-1.5 font-bold" title={courseName}>
+        <span className="c-text flex min-w-0 items-center gap-1.5 font-bold" title={courseCode ? `${courseName} (${courseCode})` : courseName}>
           <span className="c-dot h-2 w-2 shrink-0 rounded-full" aria-hidden="true" />
           <span className="truncate">{courseName}</span>
+          <CourseCode code={courseCode} />
         </span>
         <span className="shrink-0 font-semibold" style={{ color: MUTED }}>
           {now ? timeAgo(a.postedAt, now) : "\u00A0"}

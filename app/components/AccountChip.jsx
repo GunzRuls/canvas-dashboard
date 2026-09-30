@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 const INK = "var(--ink)";
@@ -88,9 +89,9 @@ export default function AccountChip({ account }) {
               <a href={account.profileUrl} target="_blank" rel="noreferrer" className="btn btn-soft h-8 flex-1 text-xs">
                 Canvas profile
               </a>
-              <a href="/setup" className="btn btn-soft h-8 flex-1 text-xs">
+              <Link href="/setup" scroll={false} className="btn btn-soft h-8 flex-1 text-xs">
                 Change account
-              </a>
+              </Link>
             </div>
             <p className="mt-2.5 text-[11px] leading-snug" style={{ color: MUTED }}>
               Not you? Paste your own Canvas token in Settings.

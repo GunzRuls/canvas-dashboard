@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { tidyCourseName, tidyCourseCode } from "../lib/courseNames.js";
+import { tidyCourseName, tidyCourseCode, displayCode } from "../lib/courseNames.js";
 
 // Real names and codes from Canvas at Florida Poly.
 test("drops the term and section in parentheses", () => {
@@ -34,4 +34,13 @@ test("course code: real code from the code or the name", () => {
 test("course code: keeps Canvas's code when there's no real one", () => {
   assert.equal(tidyCourseCode("Capstone1_FA2026", "Capstone 1 FA 26"), "Capstone1_FA2026");
   assert.equal(tidyCourseCode("Career Services", "Career Services"), "Career Services");
+});
+
+test("display code: real codes only, with a thin space", () => {
+  assert.equal(displayCode({ code: "CEN4065" }), "CEN 4065");
+  assert.equal(displayCode({ code: "CHM2045L" }), "CHM 2045L");
+  assert.equal(displayCode({ code: "Capstone1_FA2026" }), "");
+  assert.equal(displayCode({ code: "80250.202680" }), "");
+  assert.equal(displayCode({}), "");
+  assert.equal(displayCode(null), "");
 });
