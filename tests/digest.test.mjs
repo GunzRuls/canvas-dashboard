@@ -101,7 +101,7 @@ test("no Canvas address means no button", () => {
   assert.doesNotMatch(html, /Open Canvas/);
 });
 
-test("dark mode: color-scheme meta, a real dark palette, and Outlook web overrides", () => {
+test("dark mode: color-scheme meta, text/line tweaks, and Outlook web hooks", () => {
   const { html } = build({
     items: [item("Late lab", at(-30)), item("Quiz 2", at(9))],
     announcements: [{ courseId: 2, title: "Exam moved", postedAt: at(-3), preview: "", read: false }],
@@ -109,17 +109,31 @@ test("dark mode: color-scheme meta, a real dark palette, and Outlook web overrid
   assert.match(html, /<meta name="color-scheme" content="light dark">/);
   assert.match(html, /<meta name="supported-color-schemes" content="light dark">/);
   assert.match(html, /:root \{ color-scheme: light dark;/);
-  // Apple Mail / iOS: the dark palette under prefers-color-scheme
-  assert.match(html, /@media \(prefers-color-scheme: dark\)[\s\S]*\.em-card \{ background-color:#1E1D2E !important; \}/);
-  // Outlook.com / Outlook on the web: data-ogsb (backgrounds) and data-ogsc (text)
-  assert.match(html, /\[data-ogsb\] \.em-page, \.em-page\[data-ogsb\] \{ background-color:#14131F !important; \}/);
-  assert.match(html, /\[data-ogsb\] \.em-row-overdue[^{]*\{ background-color:#3A1718 !important; \}/);
+  // Apple Mail / iOS: light text and dark lines under prefers-color-scheme
+  assert.match(html, /@media \(prefers-color-scheme: dark\)[\s\S]*\.em-ink, \.em-ink a \{ color:#F2F0FA !important; \}/);
+  assert.match(html, /@media \(prefers-color-scheme: dark\)[\s\S]*\.em-line \{ border-color:#34324A !important; \}/);
+  // Outlook.com / Outlook on the web: data-ogsc (text) and data-ogsb hooks
   assert.match(html, /\[data-ogsc\] \.em-ink, \.em-ink\[data-ogsc\] \{ color:#F2F0FA !important; \}/);
-  // Class colors: a light tint as text in dark mode, the vivid fill kept for dots
   assert.match(html, /\[data-ogsc\] \.em-t-FF7A2F[^{]*\{ color:#FFB085 !important; \}/);
-  assert.match(html, /\[data-ogsb\] \.em-f-FF7A2F[^{]*\{ background-color:#FF7A2F !important; \}/);
-  // The banner stays brand blue in both themes
   assert.match(html, /\[data-ogsb\] \.em-brand[^{]*\{ background-color:#3355FF !important; \}/);
+  // No dark background rules for page/card/rows any more: nothing is filled there
+  assert.doesNotMatch(html, /em-page|em-card|em-tile|em-row-/);
+});
+
+test("no page or card background: the email blends into the reading pane", () => {
+  const { html } = build({ items: [item("Late lab", at(-30)), item("Quiz 2", at(9))] });
+  const bodyTag = html.match(/<body[^>]*>/)[0];
+  assert.doesNotMatch(bodyTag, /bgcolor|background/);
+  const body = html.slice(html.indexOf("<body"));
+  const wrapper = body.match(/<table[^>]*>/)[0];
+  assert.doesNotMatch(wrapper, /bgcolor|background/);
+  assert.match(body, /max-width:720px/);
+  assert.match(body, /<!--\[if mso\]><table role="presentation" width="720"/);
+  assert.doesNotMatch(body, /max-width:600px/);
+  // Only the brand blue (banner, button) and the small class/section dots are filled.
+  const fills = new Set([...body.matchAll(/background-color:(#[0-9A-Fa-f]{6})/g)].map((m) => m[1].toUpperCase()));
+  const allowed = new Set(["#3355FF", "#FF7A2F", "#6DBE2E", "#7C5CFA", "#13A3B5", "#EF4F8C", "#2F6BFF", "#FFB020", "#E5484D", "#8A879C"]);
+  for (const f of fills) assert.ok(allowed.has(f), `unexpected fill ${f}`);
 });
 
 test("every inline text or background color has a class the dark rules can target", () => {
@@ -140,4 +154,52 @@ test("headings stay at weight 700 or lighter with a system-font fallback", () =>
   const { html } = build({ items: [item("Quiz 2", at(9))] });
   assert.doesNotMatch(html, /font-weight:(800|900)/);
   assert.match(html, /font-family:'Bricolage Grotesque','Segoe UI',-apple-system/);
+});
+
+test("banner and brochure styles show the same sections, items and one Open Canvas button", () => {
+  const data = {
+    items: [item("Late lab", at(-30)), item("Quiz 2", at(9)), item("Reading", at(26)), item("Team", at(5 * 24), { courseId: 2 })],
+    announcements: [
+      { courseId: 1, title: "Exam moved", postedAt: at(-3), preview: "See you Friday", read: false, url: `${CANVAS}/a` },
+      { courseId: 2, title: "Room change", postedAt: at(-4), preview: "", read: false },
+      { courseId: 2, title: "Lab open", postedAt: at(-5), preview: "", read: false },
+    ],
+  };
+  const labels = ["Overdue", "Due today", "Due tomorrow", "Later this week", "New announcements"];
+  const titles = ["Late lab", "Quiz 2", "Reading", "Team", "Exam moved", "Room change", "Lab open"];
+  const banner = build(data);
+  const brochure = build(data, { style: "brochure" });
+  assert.notEqual(banner.html, brochure.html);
+  assert.equal(banner.subject, brochure.subject);
+  assert.equal(banner.preheader, brochure.preheader);
+  for (const { html } of [banner, brochure]) {
+    for (const l of labels) assert.match(html, new RegExp(`>${l}<`));
+    for (const t of titles) assert.match(html, new RegExp(`>${t}<`));
+    assert.equal(html.match(/Open Canvas/g).length, 1);
+    assert.match(html, /href="https:\/\/school\.instructure\.com\/"[^>]*>Open Canvas</);
+    assert.match(html, /max-width:720px/);
+    assert.doesNotMatch(html.match(/<body[^>]*>/)[0], /bgcolor|background/);
+    assert.doesNotMatch(html, /font-weight:(800|900)/);
+    // every inline color or background has a class the dark rules can target
+    const body = html.slice(html.indexOf("<body"));
+    for (const tag of body.match(/<[a-z]+ [^>]*style="[^"]*(?:^|[;"\s])(?:color|background-color):[^>]*>/g)) {
+      if (!/display:none/.test(tag)) assert.match(tag, /class="[^"]*em-/, tag.slice(0, 120));
+    }
+  }
+});
+
+test("brochure: quiet day, escaping, and no button without a Canvas address", () => {
+  const quiet = build({}, { style: "brochure" });
+  assert.match(quiet.html, /all caught up/);
+  assert.match(quiet.html, /Nothing due today or tomorrow/);
+  const evil = `<script>alert("x")</script>`;
+  const { html } = build(
+    {
+      courses: [{ id: 1, name: `<b>Class</b>`, color: "#FF7A2F" }],
+      items: [item(evil, at(3), { url: "javascript:alert(1)" })],
+      announcements: [{ courseId: 1, title: evil, postedAt: at(-1), preview: evil, read: false }],
+    },
+    { style: "brochure", canvasUrl: "" }
+  );
+  assert.doesNotMatch(html, /<script>|<b>Class|javascript:|Open Canvas/);
 });
