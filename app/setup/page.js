@@ -2,6 +2,7 @@ import SetupForm from "../components/SetupForm";
 import Onboarding from "../components/Onboarding";
 import { isConfigured } from "@/lib/config";
 import { settingsProps } from "./settingsProps";
+import { tourProps } from "./tourProps";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,8 @@ export const metadata = { title: "Settings · School Dashboard" };
 // (app/@modal/(.)setup). This full page is for direct visits, reloads, and plain /setup links.
 export default async function SetupPage({ searchParams }) {
   if (!isConfigured()) return <Onboarding />;
-  const { fix } = await searchParams;
+  const { fix, tour } = await searchParams;
+  // `?tour=1`: walk through onboarding again without saving anything (Settings links here).
+  if (tour === "1") return <Onboarding tour={await tourProps()} />;
   return <SetupForm {...await settingsProps(fix)} />;
 }

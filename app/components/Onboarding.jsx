@@ -4,16 +4,38 @@ import { useEffect, useRef, useState } from "react";
 import { Input, CanvasAddressHelp, TokenHelp, GmailHelp, ResendHelp } from "./setupHelp";
 import { CalendarLinkField } from "./CalendarSettings";
 import { ClassTimesRow, EMPTY_TIMES, isBlank, timesProblem } from "./ClassTimes";
+import { tourResponse } from "@/lib/tour";
 
 // First launch: a step-by-step setup instead of one long form. Canvas is required; class times
 // (listed right after Canvas connects), the calendar and email can be skipped. Each save goes through /api/config, which checks
 // Canvas (and calendar links) before anything is stored. Later changes happen in Settings.
+//
+// Walkthrough (`tour` = { name, classes } of the connected account, from /setup?tour=1): the same
+// screens, but every write goes through `send` below, which answers locally (lib/tour.js) instead
+// of calling the server, and the theme is only previewed. Nothing is saved.
 
 const INK = "var(--ink)";
 const MUTED = "var(--muted)";
 const STEPS = ["welcome", "school", "connect", "calendar", "email", "look", "done"];
 
-export default function Onboarding() {
+// The only way onboarding writes anything. In a walkthrough nothing leaves the page.
+function sender(tour) {
+  if (tour) {
+    // A short pause so buttons show "Checking…" like the real thing.
+    return (url, body) => new Promise((resolve) => setTimeout(() => resolve(tourResponse(url, body, tour)), 400));
+  }
+  return async (url, body) => {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    return res.json();
+  };
+}
+
+export default function Onboarding({ tour = null }) {
+  const send = sender(tour);
   const [step, setStep] = useState(0);
   const [canvasBaseUrl, setCanvasBaseUrl] = useState("");
   const [canvasToken, setCanvasToken] = useState("");
@@ -49,12 +71,7 @@ export default function Onboarding() {
     setBusy(true);
     setError("");
     try {
-      const res = await fetch("/api/config", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ canvasBaseUrl, timezone: browserTimezone(), ...extra }),
-      });
-      const data = await res.json();
+      const data = await send("/api/config", { canvasBaseUrl, timezone: browserTimezone(), ...extra });
       if (!data.ok) throw new Error(data.error || "That didn't save.");
       return data;
     } catch (err) {
@@ -94,8 +111,14 @@ export default function Onboarding() {
 
   function chooseTheme(value) {
     setTheme(value);
-    applyTheme(value);
+    applyTheme(value, !tour);
   }
+
+  // A walkthrough only previews the theme; leaving puts the saved one back.
+  useEffect(() => {
+    if (!tour) return;
+    return () => applyTheme(savedTheme(), false);
+  }, [tour]);
 
   const name = STEPS[step];
   const progress = step / (STEPS.length - 1);
@@ -104,6 +127,7 @@ export default function Onboarding() {
 
   return (
     <main className="flex min-h-screen flex-col">
+      {tour && <TourBanner />}
       <div className="h-1 w-full" style={{ background: "var(--surface-2)" }} aria-hidden="true">
         <div className="h-full transition-[width] duration-300" style={{ width: `${progress * 100}%`, background: "var(--focus)" }} />
       </div>
@@ -211,6 +235,8 @@ export default function Onboarding() {
 
           {name === "connect" && connected && (
             <ClassesList
+              tour={Boolean(tour)}
+              send={send}
               connected={connected}
               back={back}
               skip={next}
@@ -383,6 +409,11 @@ export default function Onboarding() {
                   {emailSaved ? `✓ Morning email to ${digestToEmail}` : "– Morning email skipped"}
                 </li>
               </ul>
+              {tour && (
+                <p className="mt-4 rounded-xl px-4 py-3 text-sm font-bold" style={{ background: "var(--brand-tint)", color: "var(--brand-text)" }}>
+                  That was the walkthrough. Nothing was saved, and your real settings are unchanged.
+                </p>
+              )}
               <p className="mt-4 text-sm" style={{ color: MUTED }}>
                 Change any of this later from <b>Settings</b> at the top of the dashboard. Hide or rename classes
                 and change class times with <b>Manage classes</b>.
@@ -417,13 +448,16 @@ function savedTheme() {
   }
 }
 
-// Saves the theme and switches the page to it right away ("system" follows Windows).
-function applyTheme(value) {
+// Switches the page to the theme right away ("system" follows Windows) and, unless `remember`
+// is false (walkthrough preview), saves it.
+function applyTheme(value, remember = true) {
   const root = document.documentElement;
-  try {
-    if (value === "system") localStorage.removeItem("dashboard-theme");
-    else localStorage.setItem("dashboard-theme", value);
-  } catch {}
+  if (remember) {
+    try {
+      if (value === "system") localStorage.removeItem("dashboard-theme");
+      else localStorage.setItem("dashboard-theme", value);
+    } catch {}
+  }
   if (value === "system") root.removeAttribute("data-theme");
   else root.setAttribute("data-theme", value);
 }
@@ -439,7 +473,7 @@ async function fetchClasses() {
 // row with day toggles and times next to each. Canvas at most schools doesn't list meeting times, so
 // they're entered once per semester. Saving sends only class times and hidden classes; names and
 // colors are kept.
-function ClassesList({ connected, back, skip, onSaved }) {
+function ClassesList({ tour, send, connected, back, skip, onSaved }) {
   const [rows, setRows] = useState(null); // [{ id, name, code, color, hidden, times }]
   const [before, setBefore] = useState({ schedule: {}, hidden: [] }); // what's already saved
   const [loadError, setLoadError] = useState("");
@@ -452,8 +486,13 @@ function ClassesList({ connected, back, skip, onSaved }) {
   const load = () =>
     fetchClasses().then(
       (data) => {
-        setBefore({ schedule: data.settings.schedule || {}, hidden: data.settings.hidden || [] });
-        setRows(data.courses.map((c) => ({ ...c, times: c.schedule || EMPTY_TIMES })));
+        if (tour) {
+          // Show it the way a new user sees it: Canvas's names, nothing hidden, no times yet.
+          setRows(data.courses.map((c) => ({ ...c, name: c.defaultName || c.name, hidden: false, times: EMPTY_TIMES })));
+        } else {
+          setBefore({ schedule: data.settings.schedule || {}, hidden: data.settings.hidden || [] });
+          setRows(data.courses.map((c) => ({ ...c, times: c.schedule || EMPTY_TIMES })));
+        }
         setLoadError("");
       },
       (err) => setLoadError(err.message)
@@ -488,12 +527,7 @@ function ClassesList({ connected, back, skip, onSaved }) {
     const listed = new Set(rows.map((r) => r.id));
     const hidden = [...before.hidden.filter((id) => !listed.has(id)), ...notClasses.map((r) => r.id)];
     try {
-      const res = await fetch("/api/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ schedule, hidden }),
-      });
-      const data = await res.json();
+      const data = await send("/api/settings", { schedule, hidden });
       if (!data.ok) throw new Error(data.error || "That didn't save.");
       onSaved(classes.filter((r) => !isBlank(r.times)).length);
     } catch (err) {
@@ -677,6 +711,26 @@ const CONNECTED_MOTION = `
 .ob-check { stroke-dasharray: 14; animation: ob-check 0.3s 0.4s ease-out both; }
 .ob-rise { animation: ob-rise 0.3s ease-out both; }
 `;
+
+// Always on top during a walkthrough. "Exit" is a full page load on purpose: it skips the
+// Settings pop-up route and starts the dashboard fresh with the saved theme.
+function TourBanner() {
+  return (
+    <div
+      role="status"
+      className="sticky top-0 z-10 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 px-4 py-2.5 text-center text-sm"
+      style={{ background: "var(--brand-tint)", color: "var(--brand-text)" }}
+    >
+      <span>
+        <b>Walkthrough:</b> nothing you enter here is saved. Your real settings stay as they are.
+      </span>
+      {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- full load on purpose (see above) */}
+      <a href="/" className="font-extrabold underline underline-offset-2 hover:no-underline">
+        Exit walkthrough
+      </a>
+    </div>
+  );
+}
 
 function Card({ children }) {
   return (
