@@ -1,22 +1,26 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Input, CanvasAddressHelp, TokenHelp, CalendarHelp, GmailHelp, ResendHelp } from "./setupHelp";
+import { Input, CanvasAddressHelp, TokenHelp, GmailHelp, ResendHelp } from "./setupHelp";
+import { CalendarLinkField } from "./CalendarSettings";
+import ClassTimes, { EMPTY_TIMES, isBlank, timesProblem } from "./ClassTimes";
 
 // First launch: a step-by-step setup instead of one long form. Canvas is required; the
-// calendar and email steps can be skipped. Each save goes through /api/config, which checks
+// class times, calendar and email steps can be skipped. Each save goes through /api/config, which checks
 // Canvas (and calendar links) before anything is stored. Later changes happen in Settings.
 
 const INK = "var(--ink)";
 const MUTED = "var(--muted)";
-const STEPS = ["welcome", "school", "connect", "calendar", "email", "look", "done"];
+const STEPS = ["welcome", "school", "connect", "classes", "calendar", "email", "look", "done"];
 
 export default function Onboarding() {
   const [step, setStep] = useState(0);
   const [canvasBaseUrl, setCanvasBaseUrl] = useState("");
   const [canvasToken, setCanvasToken] = useState("");
   const [connected, setConnected] = useState(null); // { name, classes } once Canvas accepts the token
+  const [classTimes, setClassTimes] = useState(null); // how many classes got times, once saved
   const [calendarUrls, setCalendarUrls] = useState("");
+  const [calendarSource, setCalendarSource] = useState("google");
   const [calendarSaved, setCalendarSaved] = useState(false);
   const [emailProvider, setEmailProvider] = useState("gmail");
   const [gmailAddress, setGmailAddress] = useState("");
@@ -231,26 +235,36 @@ export default function Onboarding() {
             </form>
           )}
 
+          {name === "classes" && (
+            <ClassesStep
+              back={back}
+              skip={next}
+              saved={classTimes}
+              onSaved={(count) => {
+                setClassTimes(count);
+                next();
+              }}
+            />
+          )}
+
           {name === "calendar" && (
             <form onSubmit={saveCalendar}>
               <Card>
-                <Title>Add your Google Calendar?</Title>
+                <Title>Add your calendar?</Title>
                 <Lead>
-                  Optional. Your events show up in the week view, and class times help Smart Check in find your
-                  classes.
+                  Optional. Google Calendar or Outlook. Events about your classes show up in the week view, and class
+                  times help Smart Check in find your classes. Personal events stay off the dashboard unless you turn
+                  them on in Settings.
                 </Lead>
                 <div className="mt-4">
-                  <CalendarHelp inline />
+                  <CalendarLinkField
+                    source={calendarSource}
+                    setSource={setCalendarSource}
+                    url={calendarUrls}
+                    setUrl={setCalendarUrls}
+                    required
+                  />
                 </div>
-                <Input
-                  type="password"
-                  value={calendarUrls}
-                  onChange={setCalendarUrls}
-                  placeholder="https://calendar.google.com/calendar/ical/…"
-                  required
-                  className="mt-4"
-                  aria-label="Secret calendar link"
-                />
                 <ErrorNote text={error} />
                 <Actions>
                   <Secondary onClick={back}>Back</Secondary>
@@ -383,8 +397,13 @@ export default function Onboarding() {
               <Title>You&apos;re all set</Title>
               <ul className="mt-4 space-y-1.5 text-sm" style={{ color: "var(--ink-soft)" }}>
                 <li>✓ Canvas connected{connected?.classes != null ? ` (${connected.classes} classes)` : ""}</li>
+                <li style={{ color: classTimes ? undefined : MUTED }}>
+                  {classTimes
+                    ? `✓ Class times for ${classTimes} ${classTimes === 1 ? "class" : "classes"}`
+                    : "– Class times skipped"}
+                </li>
                 <li style={{ color: calendarSaved ? undefined : MUTED }}>
-                  {calendarSaved ? "✓ Google Calendar added" : "– Google Calendar skipped"}
+                  {calendarSaved ? "✓ Calendar added" : "– Calendar skipped"}
                 </li>
                 <li style={{ color: emailSaved ? undefined : MUTED }}>
                   {emailSaved ? `✓ Morning email to ${digestToEmail}` : "– Morning email skipped"}
@@ -392,7 +411,7 @@ export default function Onboarding() {
               </ul>
               <p className="mt-4 text-sm" style={{ color: MUTED }}>
                 Change any of this later from <b>Settings</b> at the top of the dashboard. Hide or rename classes
-                with <b>Manage classes</b>.
+                and change class times with <b>Manage classes</b>.
               </p>
               <Actions>
                 <Primary onClick={() => window.location.assign("/")}>Open my dashboard</Primary>
@@ -402,6 +421,204 @@ export default function Onboarding() {
         </div>
       </div>
     </main>
+  );
+}
+
+async function fetchClasses() {
+  const res = await fetch("/api/settings");
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || "Couldn't load your classes.");
+  return data;
+}
+
+// "When are your classes?" Canvas at most schools doesn't list meeting times, so they're entered
+// once per semester. Saving sends only class times and hidden classes; names and colors are kept.
+function ClassesStep({ back, skip, saved, onSaved }) {
+  const [rows, setRows] = useState(null); // [{ id, name, code, color, hidden, times }]
+  const [before, setBefore] = useState({ schedule: {}, hidden: [] }); // what's already saved
+  const [loadError, setLoadError] = useState("");
+  const [error, setError] = useState("");
+  const [checked, setChecked] = useState(false); // show problems only after a save try
+  const [busy, setBusy] = useState(false);
+  const [showHidden, setShowHidden] = useState(false);
+
+  const load = () =>
+    fetchClasses().then(
+      (data) => {
+        setBefore({ schedule: data.settings.schedule || {}, hidden: data.settings.hidden || [] });
+        setRows(data.courses.map((c) => ({ ...c, times: c.schedule || EMPTY_TIMES })));
+        setLoadError("");
+      },
+      (err) => setLoadError(err.message)
+    );
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const update = (id, changes) => setRows((r) => r.map((row) => (row.id === id ? { ...row, ...changes } : row)));
+  const classes = (rows || []).filter((r) => !r.hidden);
+  const notClasses = (rows || []).filter((r) => r.hidden);
+
+  async function submit(e) {
+    e.preventDefault();
+    if (classes.some((r) => timesProblem(r.times))) {
+      setChecked(true);
+      setError("Some class times aren't finished. Fix them, or clear that class's days and times to skip it.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    // Start from what's saved, so classes not listed here keep their times and hidden state.
+    const schedule = { ...before.schedule };
+    for (const r of rows) {
+      if (r.hidden || isBlank(r.times)) delete schedule[r.id];
+      else schedule[r.id] = r.times;
+    }
+    const listed = new Set(rows.map((r) => r.id));
+    const hidden = [...before.hidden.filter((id) => !listed.has(id)), ...notClasses.map((r) => r.id)];
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ schedule, hidden }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "That didn't save.");
+      onSaved(classes.filter((r) => !isBlank(r.times)).length);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} noValidate>
+      <Card>
+        <Title>When are your classes?</Title>
+        <Lead>
+          Canvas doesn&apos;t list class times, so add them once per semester. They power the <b>Next class</b> card
+          and <b>Check in</b>. Leave a class empty to skip it. You can change these later in Manage classes.
+        </Lead>
+
+        {!rows && !loadError && (
+          <p className="mt-5 text-sm" style={{ color: MUTED }} role="status">
+            Loading your classes…
+          </p>
+        )}
+        {loadError && (
+          <>
+            <ErrorNote text={loadError} />
+            <button type="button" onClick={load} className="btn btn-secondary mt-2 px-4 py-2 text-sm">
+              Try again
+            </button>
+          </>
+        )}
+
+        {rows && (
+          <ul className="mt-5 flex flex-col gap-5">
+            {classes.map((r, i) => {
+              const above = classes[i - 1];
+              const problem = checked ? timesProblem(r.times) : "";
+              return (
+                <li key={r.id} className="flex flex-col gap-2" style={{ "--c": r.color }}>
+                  <div className="flex items-center gap-2.5">
+                    <span className="c-dot h-2.5 w-2.5 flex-none rounded-full" aria-hidden="true" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold" style={{ color: INK }}>
+                        {r.name}
+                      </p>
+                      {r.code && r.code !== r.name && (
+                        <p className="truncate text-xs" style={{ color: MUTED }}>
+                          {r.code}
+                        </p>
+                      )}
+                    </div>
+                    {above && !isBlank(above.times) && (
+                      <button
+                        type="button"
+                        onClick={() => update(r.id, { times: { ...above.times, days: [...above.times.days] } })}
+                        className="btn btn-soft flex-none rounded-md px-2.5 py-1 text-xs"
+                        aria-label={`Same times as ${above.name}`}
+                      >
+                        Same as above
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => update(r.id, { hidden: true })}
+                      className="btn btn-soft flex-none rounded-md px-2.5 py-1 text-xs"
+                      aria-label={`${r.name} isn't a class. Hide it`}
+                    >
+                      Not a class
+                    </button>
+                  </div>
+                  <ClassTimes
+                    value={r.times}
+                    onChange={(times) => update(r.id, { times })}
+                    color={r.color}
+                    label={r.name}
+                    invalid={Boolean(problem)}
+                  />
+                  {problem && (
+                    <p className="text-xs font-bold" style={{ color: "var(--red-fg)" }}>
+                      {problem}
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+            {!classes.length && (
+              <li className="text-sm" style={{ color: MUTED }}>
+                No classes to set up.
+              </li>
+            )}
+          </ul>
+        )}
+
+        {notClasses.length > 0 && (
+          <div className="mt-5 rounded-xl px-4 py-3" style={{ background: "var(--surface-2)" }}>
+            <button
+              type="button"
+              onClick={() => setShowHidden(!showHidden)}
+              aria-expanded={showHidden}
+              className="text-sm font-bold hover:underline"
+              style={{ color: "var(--ink-soft)" }}
+            >
+              <span aria-hidden="true">{showHidden ? "▾" : "▸"}</span> Hidden, not a class ({notClasses.length})
+            </button>
+            {showHidden && (
+              <ul className="mt-2 flex flex-col gap-1.5">
+                {notClasses.map((r) => (
+                  <li key={r.id} className="flex items-center gap-2.5 text-sm" style={{ "--c": r.color, color: INK }}>
+                    <span className="c-dot h-2.5 w-2.5 flex-none rounded-full" aria-hidden="true" />
+                    <span className="min-w-0 flex-1 truncate">{r.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => update(r.id, { hidden: false })}
+                      className="btn btn-secondary flex-none rounded-md px-2.5 py-1 text-xs"
+                      aria-label={`${r.name} is a class. Show it`}
+                    >
+                      It&apos;s a class
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        <ErrorNote text={error} />
+        <Actions>
+          <Secondary onClick={back}>Back</Secondary>
+          <Primary type="submit" disabled={busy || !rows}>
+            {busy ? "Saving…" : saved != null ? "Save again" : "Save class times"}
+          </Primary>
+          <Skip onClick={skip}>{saved != null ? "Next" : "Skip for now"}</Skip>
+        </Actions>
+      </Card>
+    </form>
   );
 }
 

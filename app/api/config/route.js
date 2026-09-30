@@ -1,4 +1,5 @@
-import { getConfig, saveConfig, SECRET_FIELDS } from "@/lib/config";
+import { getConfig, saveConfig, calendarList, publicConfig, SECRET_FIELDS } from "@/lib/config";
+import { normalShow } from "@/lib/calendarKind";
 import { fromThisApp } from "@/lib/sameOrigin";
 import { digestEnabled, gmailTransport, gmailErrorMessage } from "@/lib/digest";
 import { scheduleDigest } from "@/lib/schedule";
@@ -30,10 +31,27 @@ function calendarLinks(input) {
     .map((u) => u.trim().replace(/^webcal:\/\//i, "https://"))
     .filter(Boolean)
     .map((u) => {
-      if (!/^https:\/\/\S+$/i.test(u)) throw new Error("Each Google Calendar link must start with https://");
+      if (!/^https:\/\/\S+$/i.test(u)) throw new Error("A calendar link must start with https:// (or webcal://).");
       return u;
-    })
-    .join(",");
+    });
+}
+
+// Linked calendars. `calendars` (Settings) lists the saved ones to keep, by position, with what
+// each shows; leaving it out keeps them all. `calendarUrls` adds new links (shown as
+// `newCalendarShow`). `clear: ["calendarUrls"]` removes them all. Returns the links that are new.
+function applyCalendarSettings(body, current, clear, next) {
+  let list = calendarList(current);
+  if (clear.has("calendarUrls")) list = [];
+  if (Array.isArray(body.calendars)) {
+    list = body.calendars
+      .filter((c) => Number.isInteger(c?.index) && list[c.index])
+      .map((c) => ({ url: list[c.index].url, show: normalShow(c.show) }));
+  }
+  const added = calendarLinks(body.calendarUrls).filter((url) => !list.some((c) => c.url === url));
+  for (const url of added) list.push({ url, show: normalShow(body.newCalendarShow) });
+  next.calendarUrls = list.map((c) => c.url).join(",");
+  next.calendarShow = list.map((c) => c.show).join(",");
+  return added;
 }
 
 async function checkCanvas(base, token) {
@@ -71,15 +89,17 @@ async function countClasses(base, token) {
 }
 
 async function checkCalendars(links) {
-  for (const url of links.split(",").filter(Boolean)) {
+  for (const url of links) {
     let res;
     try {
       res = await fetch(url, { cache: "no-store" });
     } catch {
-      throw new Error("Couldn't open one of your Google Calendar links.");
+      throw new Error("Couldn't open that calendar link. Check that you copied all of it.");
     }
     if (!res.ok || !(await res.text()).includes("BEGIN:VCALENDAR")) {
-      throw new Error("One of your Google Calendar links didn't return a calendar. Use the secret iCal address.");
+      throw new Error(
+        "That link didn't return a calendar. Use Google's \"Secret address in iCal format\" or Outlook's ICS link (not the HTML one)."
+      );
     }
   }
 }
@@ -134,6 +154,7 @@ export async function POST(request) {
 
     next.canvasBaseUrl = canvasAddress(body.canvasBaseUrl);
     for (const key of SECRET_FIELDS) {
+      if (key === "calendarUrls") continue; // handled by applyCalendarSettings
       const typed = String(body[key] || "").trim();
       if (typed) next[key] = typed;
       else if (clear.has(key) && key !== "canvasToken") next[key] = "";
@@ -144,7 +165,7 @@ export async function POST(request) {
     }
     if (!next.canvasToken) throw new Error("Paste your Canvas access token.");
 
-    next.calendarUrls = calendarLinks(next.calendarUrls);
+    const addedCalendars = applyCalendarSettings(body, current, clear, next);
     applyEmailSettings(body, next);
 
     next.timezone = String(body.timezone || "").trim() || "America/New_York";
@@ -155,7 +176,7 @@ export async function POST(request) {
     }
 
     const name = await checkCanvas(next.canvasBaseUrl, next.canvasToken);
-    if (next.calendarUrls !== current.calendarUrls) await checkCalendars(next.calendarUrls);
+    await checkCalendars(addedCalendars);
     const gmailChanged =
       next.emailProvider === "gmail" &&
       (current.emailProvider !== "gmail" || next.gmailAddress !== current.gmailAddress || next.gmailAppPassword !== current.gmailAppPassword);
@@ -184,6 +205,7 @@ export async function POST(request) {
       classes: await countClasses(next.canvasBaseUrl, next.canvasToken),
       emailOn: enabled,
       scheduleWarning,
+      calendars: publicConfig().calendars,
     });
   } catch (error) {
     return Response.json({ ok: false, error: error.message }, { status: 400 });

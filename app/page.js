@@ -51,9 +51,11 @@ export default async function Home() {
       events={data.calendar.events}
       calendarEnabled={calendarEnabled()}
       calendarError={data.calendar.error}
+      hiddenEvents={data.calendar.hidden}
       digestEnabled={digestEnabled()}
       newGrades={data.newGrades}
       sessions={data.sessions}
+      account={data.account}
       loadedAt={Date.now()}
     />
   );

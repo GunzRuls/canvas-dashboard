@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Input, CanvasAddressHelp, TokenHelp, CalendarHelp, GmailHelp, ResendHelp } from "./setupHelp";
+import { useRouter } from "next/navigation";
+import { Input, CanvasAddressHelp, TokenHelp, GmailHelp, ResendHelp } from "./setupHelp";
+import { LinkedCalendars, CanvasFeed } from "./CalendarSettings";
+import { Avatar } from "./AccountChip";
 
 const INK = "var(--ink)";
 const MUTED = "var(--muted)";
@@ -15,10 +18,12 @@ function nextEmailLabel(iso) {
 }
 
 // Saved tokens and keys are never sent to this page. For those, a blank box means "keep it".
-export default function SetupForm({ saved, firstRun, installed, version, fixToken, emailOn, nextEmail }) {
+export default function SetupForm({ saved, firstRun, installed, version, fixToken, emailOn, nextEmail, account }) {
   const [canvasBaseUrl, setCanvasBaseUrl] = useState(saved.canvasBaseUrl);
   const [canvasToken, setCanvasToken] = useState("");
-  const [calendarUrls, setCalendarUrls] = useState("");
+  const [calendars, setCalendars] = useState(() => (saved.calendars || []).map((c, index) => ({ ...c, index })));
+  const [newCalendarUrl, setNewCalendarUrl] = useState("");
+  const [newCalendarShow, setNewCalendarShow] = useState("classes");
   const [emailProvider, setEmailProvider] = useState(saved.emailProvider || "gmail");
   const [gmailAddress, setGmailAddress] = useState(saved.gmailAddress);
   const [gmailAppPassword, setGmailAppPassword] = useState("");
@@ -34,6 +39,14 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null); // { ok, text }
   const [error, setError] = useState("");
+  const [savedNote, setSavedNote] = useState(""); // "Saved" next to the button, fades after a moment
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!savedNote) return;
+    const timer = setTimeout(() => setSavedNote(""), 4000);
+    return () => clearTimeout(timer);
+  }, [savedNote]);
 
   // On first launch, start with this computer's time zone.
   useEffect(() => {
@@ -43,14 +56,8 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
     } catch {}
   }, [firstRun, saved.timezone]);
 
-  const hasCalendar = saved.calendarCount > 0 && !clear.includes("calendarUrls");
   const hasGmailPassword = saved.hasGmailPassword && !clear.includes("gmailAppPassword");
   const hasResendKey = saved.hasResendKey && !clear.includes("resendApiKey");
-
-  function remove(key) {
-    setClear((c) => [...c, key]);
-    setCalendarUrls("");
-  }
 
   // Turning the email off forgets the app password and Resend key too.
   function turnOffEmail() {
@@ -71,7 +78,9 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
         body: JSON.stringify({
           canvasBaseUrl,
           canvasToken,
-          calendarUrls,
+          calendars: calendars.map(({ index, show }) => ({ index, show })),
+          calendarUrls: newCalendarUrl,
+          newCalendarShow,
           emailProvider: emailOff ? "" : emailProvider,
           gmailAddress,
           gmailAppPassword,
@@ -86,6 +95,20 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Couldn't save.");
+      // The page can stay open after a save (test email), so continue from what was saved.
+      if (data.calendars) {
+        setCalendars(data.calendars.map((c, index) => ({ ...c, index })));
+        setNewCalendarUrl("");
+      }
+      // Stay on this page: secrets are saved, so empty their boxes, then fetch the saved state
+      // (token ending, email status, next send time) without reloading. A ?fix=token link is
+      // done once the new token is saved.
+      setCanvasToken("");
+      setGmailAppPassword("");
+      setResendApiKey("");
+      setClear([]);
+      if (fixToken) router.replace("/setup");
+      else router.refresh();
       return data;
     } catch (err) {
       setError(err.message);
@@ -96,15 +119,15 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
   async function submit(e) {
     e.preventDefault();
     setSaving(true);
+    setSavedNote("");
     const data = await save();
-    if (data?.scheduleWarning) {
-      setError(`Saved, but ${data.scheduleWarning}`);
-      setSaving(false);
-    } else if (data) {
+    if (data && firstRun) {
       window.location.assign("/");
-    } else {
-      setSaving(false);
+      return;
     }
+    if (data?.scheduleWarning) setError(`Saved, but ${data.scheduleWarning}`);
+    else if (data) setSavedNote("Saved");
+    setSaving(false);
   }
 
   // Saves first (so Gmail checks the app password), then sends one right now.
@@ -156,6 +179,24 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
 
       <form onSubmit={submit} className="mt-6 flex flex-col gap-4">
         <Section title="Canvas" note="Required">
+          {account && (
+            <div className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ background: "var(--surface-2)" }}>
+              <Avatar account={account} size={36} />
+              <div className="min-w-0 text-sm">
+                <p className="text-xs font-bold" style={{ color: MUTED }}>
+                  Connected as
+                </p>
+                <p className="truncate font-extrabold" style={{ color: INK }}>
+                  {account.name}
+                  {account.login && (
+                    <span className="font-semibold" style={{ color: "var(--ink-soft)" }}>
+                      {" "}· {account.login}
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+          )}
           <Field
             label="Your school's Canvas address"
             help={<CanvasAddressHelp />}
@@ -184,26 +225,23 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
         </Section>
 
         <Section
-          title="Google Calendar"
+          title="Show my calendar here"
           note="Optional"
-          open={hasCalendar}
-          status={hasCalendar ? `${saved.calendarCount} calendar${saved.calendarCount === 1 ? "" : "s"} linked` : ""}
-          onRemove={hasCalendar ? () => remove("calendarUrls") : null}
+          open={calendars.length > 0}
+          status={calendars.length ? `${calendars.length} linked` : ""}
         >
-          <p className="text-sm" style={{ color: MUTED }}>
-            Shows your events in the week strip and helps find class times.
-          </p>
-          <Field
-            label="Secret calendar link"
-            help={<CalendarHelp />}
-          >
-            <Input
-              type="password"
-              value={calendarUrls}
-              onChange={setCalendarUrls}
-              placeholder={hasCalendar ? "Leave blank to keep your saved links" : "https://calendar.google.com/calendar/ical/…"}
-            />
-          </Field>
+          <LinkedCalendars
+            calendars={calendars}
+            setCalendars={setCalendars}
+            newUrl={newCalendarUrl}
+            setNewUrl={setNewCalendarUrl}
+            newShow={newCalendarShow}
+            setNewShow={setNewCalendarShow}
+          />
+        </Section>
+
+        <Section title="Send Canvas to my calendar" note="Optional" open={false}>
+          <CanvasFeed />
         </Section>
 
         <Section
@@ -368,6 +406,11 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
           >
             {saving ? "Checking with Canvas…" : firstRun ? "Connect and open dashboard" : "Save"}
           </button>
+          {savedNote && (
+            <span role="status" className="step-in text-sm font-bold" style={{ color: "var(--green-fg)" }}>
+              ✓ {savedNote}. Changes are live on your dashboard.
+            </span>
+          )}
         </div>
       </form>
 
@@ -401,7 +444,7 @@ function Maintenance({ installed, version }) {
   }
 
   return (
-    <section className="mt-8 rounded-2xl p-5" style={{ background: "var(--surface)" }}>
+    <section className="settings-card mt-8 rounded-2xl p-5" style={{ background: "var(--surface)" }}>
       <span className="font-display text-lg font-extrabold" style={{ color: INK }}>
         {installed ? "Update or uninstall" : "Reinstall or uninstall"}
       </span>
@@ -452,7 +495,7 @@ function Section({ title, note, open = true, status, warning, onRemove, removeLa
   const body = <div className="mt-3 flex flex-col gap-3">{children}</div>;
   const heading = (
     <span className="flex flex-wrap items-baseline gap-2">
-      <span className="font-display text-lg font-extrabold" style={{ color: INK }}>
+      <span className="fold-title font-display text-lg font-extrabold" style={{ color: INK }}>
         {title}
       </span>
       <span className="text-xs font-bold uppercase tracking-wide" style={{ color: MUTED }}>
@@ -472,10 +515,19 @@ function Section({ title, note, open = true, status, warning, onRemove, removeLa
   );
 
   return (
-    <section className="rounded-2xl p-5" style={{ background: "var(--surface)" }}>
+    <section className="settings-card rounded-2xl p-5" style={{ background: "var(--surface)" }}>
       {note === "Optional" ? (
         <details open={open}>
-          <summary className="cursor-pointer list-none">{heading}</summary>
+          <summary className="fold-summary flex items-center justify-between gap-3">
+            {heading}
+            <span
+              className="fold-chevron grid h-7 w-7 shrink-0 place-items-center rounded-full text-lg font-bold leading-none"
+              style={{ color: MUTED }}
+              aria-hidden="true"
+            >
+              ›
+            </span>
+          </summary>
           {body}
           {onRemove && (
             <button type="button" onClick={onRemove} className="mt-3 text-xs font-bold hover:underline" style={{ color: "var(--red-fg)" }}>

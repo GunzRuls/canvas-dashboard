@@ -13,8 +13,13 @@ function clock(iso) {
   return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
-export default function WeekStrip({ items, status, events, calendarEnabled, now, colorFor, nameFor }) {
-  if (!now) return <div className="h-[124px]" />;
+function onDay(e, key) {
+  if (!e.allDay) return localKey(e.start) === key;
+  return e.end > e.start ? key >= e.start && key < e.end : key === e.start;
+}
+
+export default function WeekStrip({ items, status, events, calendarEnabled, hiddenEvents = [], now, colorFor, nameFor }) {
+  if (!now) return <div className="h-[124px] flex-1" />;
 
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(now);
@@ -23,22 +28,20 @@ export default function WeekStrip({ items, status, events, calendarEnabled, now,
     return d;
   });
 
+  // Personal events kept off the strip (see lib/loadDashboard.js), counted for these 7 days.
+  const dayKeys = days.map(localKey);
+  const hiddenCount = hiddenEvents.filter((e) => dayKeys.some((key) => onDay(e, key))).length;
+
   return (
-    <div>
-      <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-        <div className="panel grid min-w-[900px] grid-cols-7 overflow-hidden">
+    <div className="flex flex-1 flex-col">
+      <div className="-mx-4 flex-1 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+        <div className="panel grid h-full min-w-[900px] grid-cols-7 overflow-hidden">
           {days.map((day, i) => {
             const key = localKey(day);
             const due = items
               .filter((it) => status[it.key] !== "done" && it.dueAt && localKey(it.dueAt) === key)
               .sort((a, b) => new Date(a.dueAt) - new Date(b.dueAt));
-            const dayEvents = events.filter((e) =>
-              e.allDay
-                ? e.end > e.start
-                  ? key >= e.start && key < e.end
-                  : key === e.start
-                : localKey(e.start) === key
-            );
+            const dayEvents = events.filter((e) => onDay(e, key));
             const heavy = due.length >= HEAVY_DAY;
             const label =
               i === 0 ? "Today" : i === 1 ? "Tomorrow" : day.toLocaleDateString(undefined, { weekday: "short" });
@@ -46,7 +49,7 @@ export default function WeekStrip({ items, status, events, calendarEnabled, now,
             return (
               <div
                 key={key}
-                className="flex h-[124px] flex-col px-2.5 py-2"
+                className="flex h-full min-h-[124px] flex-col px-2.5 py-2"
                 style={{
                   borderLeft: i === 0 ? "none" : "1px solid var(--line)",
                   background: heavy ? "var(--red-bg)" : "transparent",
@@ -118,15 +121,22 @@ export default function WeekStrip({ items, status, events, calendarEnabled, now,
           })}
         </div>
       </div>
-      {!calendarEnabled && (
+      {!calendarEnabled ? (
         <p className="mt-1 text-xs" style={{ color: MUTED }}>
-          Add your Google Calendar in{" "}
-          <a href="/setup" className="font-bold underline">
+          Add your Google or Outlook calendar in{" "}
+          <a href="/setup" className="text-link font-bold underline">
             Settings
           </a>{" "}
-          to see shifts and plans here.
+          to see class events here.
         </p>
-      )}
+      ) : hiddenCount > 0 ? (
+        <p className="mt-1 text-xs" style={{ color: MUTED }}>
+          {hiddenCount} personal event{hiddenCount === 1 ? "" : "s"} hidden.{" "}
+          <a href="/setup" className="text-link font-bold underline">
+            Show them
+          </a>
+        </p>
+      ) : null}
     </div>
   );
 }

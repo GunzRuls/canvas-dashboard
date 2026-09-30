@@ -4,6 +4,7 @@ import { isConfigured, publicConfig } from "@/lib/config";
 import { currentVersion } from "@/lib/updates";
 import { digestEnabled } from "@/lib/digest";
 import { nextDigestRun } from "@/lib/schedule";
+import { getAccount } from "@/lib/canvas";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,7 @@ export default async function SetupPage({ searchParams }) {
       fixToken={fix === "token"}
       emailOn={digestEnabled()}
       nextEmail={await nextDigestRun()}
+      account={fix === "token" ? null : await getAccount().catch(() => null)}
     />
   );
 }

@@ -7,6 +7,8 @@ import QuickAdd from "./QuickAdd";
 import WhatIfPanel from "./WhatIfPanel";
 import ManageClasses from "./ManageClasses";
 import UpdateNotice from "./UpdateNotice";
+import AccountChip from "./AccountChip";
+import NextClassCard from "./NextClassCard";
 
 const INK = "var(--ink)";
 const MUTED = "var(--muted)";
@@ -112,9 +114,11 @@ export default function Dashboard({
   events = [],
   calendarEnabled = false,
   calendarError = null,
+  hiddenEvents = [],
   digestEnabled = false,
   newGrades = [],
   sessions = [],
+  account = null,
   loadedAt,
 }) {
   const router = useRouter();
@@ -232,7 +236,6 @@ export default function Dashboard({
         ((item.type === "assignment" && g.assignmentId === item.plannableId) ||
           (item.type === "quiz" && g.quizId === item.plannableId))
     );
-  const checkIn = now ? findCheckIn(courses, sessions, now) : null;
 
   const visibleItems = items.filter((i) => !filter || i.courseId === filter);
   const visibleAnnouncements = announcements.filter(
@@ -450,7 +453,6 @@ export default function Dashboard({
           <h1 className="font-display text-2xl font-extrabold tracking-tight sm:text-3xl" style={{ color: INK }}>
             {today}
           </h1>
-          <SmartCheckIn checkIn={checkIn} />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="panel flex h-10 flex-wrap items-center gap-1 rounded-full px-3">
@@ -480,14 +482,27 @@ export default function Dashboard({
           <TopButton onClick={refresh} disabled={isRefreshing} strong>
             {isRefreshing ? "Refreshing…" : "Refresh"}
           </TopButton>
+          <AccountChip account={account} />
         </div>
       </header>
 
-      {/* Next 7 days */}
-      <section className="flex-none" aria-label="Next 7 days">
+      {/* Next class | next 7 days */}
+      <section className="grid flex-none grid-cols-1 gap-4 xl:grid-cols-[340px_minmax(0,1fr)]" aria-label="Next class and the next 7 days">
+        <NextClassCard
+          now={now}
+          courses={courses}
+          sessions={sessions}
+          items={items}
+          status={status}
+          announcements={announcements.filter((a) => !dismissedIds.has(a.id))}
+          readIds={readIds}
+          onRead={markRead}
+          onAddTimes={() => setManaging(true)}
+        />
+        <div className="flex min-w-0 flex-col">
         {calendarError && (
           <p className="mb-2 text-sm font-semibold" style={{ color: "var(--red-fg)" }}>
-            Google Calendar didn't load: {calendarError}
+            Your calendar didn't load: {calendarError}
           </p>
         )}
         <WeekStrip
@@ -495,10 +510,12 @@ export default function Dashboard({
           status={status}
           events={events}
           calendarEnabled={calendarEnabled}
+          hiddenEvents={hiddenEvents}
           now={now}
           colorFor={colorFor}
           nameFor={nameFor}
         />
+        </div>
       </section>
 
       {/* Grades: one row of rings */}
@@ -906,71 +923,6 @@ function GradeRing({ course, active, dimmed, onSelect, onWhatIf, newGrades, onSe
         </>
       )}
     </div>
-  );
-}
-
-// ---------- Smart Check in ----------
-
-function sessionsForToday(course, sessions, now) {
-  if (course.schedule) {
-    // Class times you entered in Manage classes win over the calendar.
-    const d = new Date(now);
-    if (!course.schedule.days.includes(d.getDay())) return [];
-    const at = (hhmm) => {
-      const [h, m] = hhmm.split(":").map(Number);
-      const t = new Date(now);
-      t.setHours(h, m, 0, 0);
-      return t.getTime();
-    };
-    return [{ start: at(course.schedule.start), end: at(course.schedule.end) }];
-  }
-  const today = new Date(now).toDateString();
-  return sessions
-    .filter((s) => s.courseId === course.id && new Date(s.start).toDateString() === today)
-    .map((s) => ({ start: new Date(s.start).getTime(), end: new Date(s.end).getTime() }));
-}
-
-// Check-in opens 15 minutes before class and stays up until class ends.
-function findCheckIn(courses, sessions, now) {
-  const EARLY = 15 * 60 * 1000;
-  let live = null;
-  let next = null;
-  for (const course of courses) {
-    if (!course.attendanceUrl) continue;
-    for (const s of sessionsForToday(course, sessions, now)) {
-      if (now >= s.start - EARLY && now <= s.end) {
-        if (!live || s.start > live.start) live = { course, ...s };
-      } else if (s.start - EARLY > now && (!next || s.start < next.start)) {
-        next = { course, ...s };
-      }
-    }
-  }
-  if (live) return { kind: "live", ...live };
-  if (next) return { kind: "next", ...next };
-  return null;
-}
-
-function SmartCheckIn({ checkIn }) {
-  if (!checkIn) return null;
-  const time = new Date(checkIn.start).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-  if (checkIn.kind === "next") {
-    return (
-      <span className="rounded-full bg-[var(--surface)] px-3 py-1.5 text-sm font-semibold" style={{ color: MUTED }}>
-        Next check-in: <span style={{ color: checkIn.course.color }}>{checkIn.course.name}</span> at {time}
-      </span>
-    );
-  }
-  return (
-    <a
-      href={checkIn.course.attendanceUrl}
-      target="_blank"
-      rel="noreferrer"
-      className="flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-bold text-white hover:brightness-110"
-      style={{ background: checkIn.course.color }}
-    >
-      <span className="live-dot h-2 w-2 rounded-full bg-white" aria-hidden="true" />
-      Check in: {checkIn.course.name}
-    </a>
   );
 }
 

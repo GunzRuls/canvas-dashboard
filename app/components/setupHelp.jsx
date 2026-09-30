@@ -2,7 +2,7 @@
 
 // Where to find each thing the dashboard asks for. Shared by the first-launch onboarding and
 // the Settings page so the instructions never drift apart. Keep the steps and links accurate
-// if Canvas, Google Calendar, or Resend change their pages.
+// if Canvas, Google Calendar, Outlook, Gmail, or Resend change their pages.
 
 const INK = "var(--ink)";
 const MUTED = "var(--muted)";
@@ -24,7 +24,7 @@ export function Input({ value, onChange, type = "text", className = "", ...rest 
 
 export function Ext({ href, children }) {
   return (
-    <a href={href} target="_blank" rel="noreferrer" className="font-bold underline" style={{ color: INK }}>
+    <a href={href} target="_blank" rel="noreferrer" className="text-link font-bold underline" style={{ color: INK }}>
       {children}
     </a>
   );
@@ -59,7 +59,7 @@ export function Help({ children, note, open = false, inline = false }) {
   return (
     <details className="group" open={open}>
       <summary
-        className="inline-flex cursor-pointer list-none items-center gap-1 text-xs font-bold hover:underline"
+        className="text-link inline-flex cursor-pointer list-none items-center gap-1 text-xs font-bold hover:underline"
         style={{ color: "var(--blue-fg)" }}
       >
         <span className="inline-block transition-transform group-open:rotate-90" aria-hidden="true">
@@ -132,7 +132,32 @@ export function CalendarHelp(props) {
         Scroll down to <b>Integrate calendar</b> and copy <b>Secret address in iCal format</b>. It ends in{" "}
         <b>.ics</b>.
       </li>
-      <li>Paste it here. For more than one calendar, separate the links with commas.</li>
+      <li>Paste it here. To add another calendar, save this one first, then add the next.</li>
+    </Help>
+  );
+}
+
+// Outlook.com (personal) and school/work Microsoft 365 accounts use the same steps on
+// different sites. Schools can turn publishing off; then the option is missing.
+export function OutlookHelp(props) {
+  return (
+    <Help
+      note="Keep this link private: anyone who has it can see that calendar. To stop sharing, go back to the same page and click Unpublish. Outlook can take a few hours to show new events through this link. If Publish a calendar is missing on a school account, your school turned it off; use a personal calendar instead."
+      {...props}
+    >
+      <li>
+        On a computer, click <b>Open school Outlook</b> (or <b>personal Outlook.com</b>) above. It opens with whatever
+        Microsoft account you&apos;re signed into. (Or in Outlook on the web: <b>Settings</b> (gear) → <b>Calendar</b> →{" "}
+        <b>Shared calendars</b>.)
+      </li>
+      <li>
+        Under <b>Publish a calendar</b>, pick your calendar and <b>Can view all details</b>, then click{" "}
+        <b>Publish</b>.
+      </li>
+      <li>
+        Copy the <b>ICS</b> link (not the HTML one). It ends in <b>.ics</b>.
+      </li>
+      <li>Paste it here.</li>
     </Help>
   );
 }
