@@ -1,6 +1,7 @@
 import { Bricolage_Grotesque, Figtree } from "next/font/google";
 import "./globals.css";
 import KeepAlive from "./components/KeepAlive";
+import RedirectCard from "./components/RedirectCard";
 
 // Figtree for everyday text, Bricolage Grotesque for headlines and numbers (class "font-display").
 const bricolage = Bricolage_Grotesque({
@@ -29,6 +30,7 @@ export default function RootLayout({ children }) {
       <body className="min-h-full">
         {children}
         <KeepAlive />
+        <RedirectCard />
       </body>
     </html>
   );

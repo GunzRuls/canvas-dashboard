@@ -374,3 +374,27 @@ details[open] > .fold-summary .fold-chevron {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); transition: transform 0.18s cubic-bezier(0.3, 1.4, 0.5, 1);
 }
 .modal-switch[aria-checked="true"] .modal-knob { transform: translateX(16px); }
+
+/* "Sending you to Canvas" card (RedirectCard.jsx): a centered card that pops in when you open an
+   outside link, fills a bar in the class color (--c) for 1.5 s, then fades away. It can't be
+   clicked and never blocks the page. The reduced-motion rule above switches the motion off (the
+   bar then just shows full). */
+.redirect-layer { position: fixed; inset: 0; z-index: 70; pointer-events: none; transition: opacity 0.2s ease-out; }
+.redirect-leaving { opacity: 0; }
+.redirect-backdrop { position: absolute; inset: 0; background: var(--overlay); opacity: 0.35; animation: modal-backdrop-in 0.2s ease-out both; }
+.redirect-card {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(420px, calc(100vw - 32px)); box-sizing: border-box;
+  display: flex; flex-direction: column; gap: 16px; padding: 22px; border-radius: 22px;
+  background: var(--surface);
+  box-shadow: 0 0 0 1.5px var(--c), 0 0 0 7px color-mix(in srgb, var(--c) 22%, var(--surface)), 0 24px 60px rgba(10, 8, 20, 0.3);
+  animation: redirect-in 0.28s cubic-bezier(0.2, 1.2, 0.4, 1) both;
+}
+@keyframes redirect-in {
+  from { opacity: 0; transform: translate(-50%, -40%) scale(0.94); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+.redirect-bar { transform-origin: left; animation: redirect-bar 1.5s linear both; }
+@keyframes redirect-bar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.redirect-nudge { animation: redirect-nudge 0.7s ease-in-out infinite; }
+@keyframes redirect-nudge { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(3px, -3px); } }
