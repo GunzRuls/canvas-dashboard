@@ -3,8 +3,6 @@
 import { nextClassCard } from "@/lib/nextClass";
 import { displayCode } from "@/lib/courseNames";
 
-const INK = "var(--ink)";
-const MUTED = "var(--muted)";
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 function clock(ms) {
@@ -38,46 +36,89 @@ function dueLine(item, card, now) {
   return { text: `Due ${day} · ${clock(due)}`, tone: "gray" };
 }
 
-const TONES = {
-  red: { bg: "var(--red-bg)", fg: "var(--red-fg)" },
-  amber: { bg: "var(--amber-bg)", fg: "var(--amber-fg)" },
-  gray: { bg: "var(--chip)", fg: "var(--ink-soft)" },
-};
+// Icon tile per urgency. Red/amber are solid tiles so they read on any class color.
+const TILES = { red: "hero-tile-red", amber: "hero-tile-amber", gray: "hero-glass" };
 
-function Pill({ children, live, tone = "brand" }) {
-  const style =
-    tone === "class"
-      ? { background: "color-mix(in srgb, var(--c) 14%, var(--surface))", color: "color-mix(in srgb, var(--c) 70%, var(--ink))" }
-      : tone === "plain"
-      ? { background: "var(--surface-2)", color: "var(--ink-soft)" }
-      : { background: "var(--brand-tint)", color: "var(--brand-text)" };
+// The card is filled with a bold version of the class color. Deep colors get white text on a
+// mix toward ink; light ones (sun, lime, tangerine) would turn muddy brown that way, so they
+// keep their bright color and get dark ink text instead. Both keep text at 4.5:1 or better.
+const DEEP = [27, 26, 46]; // #1B1A2E, the light theme's ink
+const WHITE = [255, 255, 255];
+const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+const mix = (a, b, p) => a.map((v, i) => Math.round(v * p + b[i] * (1 - p))); // = color-mix in srgb
+const css = (c, alpha = 1) => `rgba(${c.join(", ")}, ${alpha})`;
+function luminance(c) {
+  const [r, g, b] = c.map((v) => {
+    v /= 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+const contrast = (a, b) => {
+  const [x, y] = [luminance(a), luminance(b)].sort((m, n) => n - m);
+  return (x + 0.05) / (y + 0.05);
+};
+const SOFT = 0.85; // secondary text is the text color at 85%
+
+function heroColors(color) {
+  if (!/^#[0-9a-f]{6}$/i.test(color || "")) color = "#3355FF";
+  const c = rgb(color);
+  // Most color we can keep with white text still readable (the lighter, top-left end is the worst case).
+  const softOn = (bg) => contrast(mix(WHITE, bg, SOFT), bg);
+  let p = 0.82;
+  while (p > 0.62 && softOn(mix(c, DEEP, p)) < 4.5) p -= 0.02;
+  if (softOn(mix(c, DEEP, p)) >= 4.5) {
+    const bot = mix(c, DEEP, p - 0.2);
+    return {
+      "--hero-top": css(mix(c, DEEP, p)),
+      "--hero-bot": css(bot),
+      "--hero-fg": "#FFFFFF",
+      "--hero-soft": css(WHITE, SOFT),
+      "--hero-glass": css(DEEP, 0.22), // darker, so white text on it gets more contrast, not less
+      "--hero-hover": css(DEEP, 0.16),
+      "--hero-track": css(WHITE, 0.25),
+      "--hero-btn-bg": "#FFFFFF",
+      "--hero-btn-fg": css(bot),
+      "--hero-btn-hover": css(mix(WHITE, c, 0.88)),
+      "--hero-btn-edge": css(DEEP, 0.35),
+    };
+  }
+  return {
+    "--hero-top": css(mix(c, WHITE, 0.86)),
+    "--hero-bot": css(c),
+    "--hero-fg": css(DEEP),
+    "--hero-soft": css(DEEP, 0.8),
+    "--hero-glass": css(WHITE, 0.4), // lighter, so ink text on it gets more contrast
+    "--hero-hover": css(WHITE, 0.3),
+    "--hero-track": css(DEEP, 0.15),
+    "--hero-btn-bg": css(DEEP),
+    "--hero-btn-fg": css(c),
+    "--hero-btn-hover": css(mix(DEEP, WHITE, 0.88)),
+    "--hero-btn-edge": css([0, 0, 0], 0.35),
+  };
+}
+
+function Pill({ children, live, solid }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-extrabold" style={style}>
-      {live && <span className="live-dot c-dot h-1.5 w-1.5 rounded-full" aria-hidden="true" />}
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-extrabold ${solid ? "" : "hero-glass"}`}
+      style={solid ? { background: "var(--hero-fg)", color: "var(--hero-bot)" } : { color: "var(--hero-fg)" }}
+    >
+      {live && <span className="live-dot h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />}
       {children}
     </span>
   );
 }
 
-function Row({ href, onClick, icon, tone, title, sub, subColor }) {
+function Row({ href, onClick, icon, tile, title, sub, strong }) {
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-      onClick={onClick}
-      className="row-hover-soft group -mx-2 flex gap-2.5 rounded-lg px-2 py-1.5"
-    >
-      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg" style={{ background: tone.bg, color: tone.fg }} aria-hidden="true">
+    <a href={href} target="_blank" rel="noreferrer" onClick={onClick} className="hero-row group -mx-2 flex gap-2.5 rounded-lg px-2 py-1.5">
+      <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg ${tile}`} aria-hidden="true">
         {icon}
       </span>
       <span className="flex min-w-0 flex-col">
-        <span className="line-clamp-1 text-sm font-bold leading-snug group-hover:underline" style={{ color: INK }}>
-          {title}
-        </span>
-        <span className="text-xs font-semibold" style={{ color: subColor || MUTED }}>
-          {sub}
-        </span>
+        <span className="line-clamp-1 text-sm font-bold leading-snug group-hover:underline">{title}</span>
+        <span className={`text-xs ${strong ? "font-extrabold" : "hero-soft font-semibold"}`}>{sub}</span>
       </span>
     </a>
   );
@@ -101,9 +142,13 @@ const ArrowIcon = (
   </svg>
 );
 
+// The empty card uses the brand blue (light theme's --brand) in both themes, like a class color.
+const BRAND_FILL = heroColors("#3355FF");
+
 // The class coming up (or happening now): when, Check in (only during class), the most urgent
 // thing due for it, and its newest unread announcement. Class times come from Manage classes
 // (or calendar events that mention the class); Canvas itself doesn't have them.
+// The card is filled with the class color so it stands out from the panels around it.
 export default function NextClassCard({ now, courses, sessions, items, status, announcements, readIds, onRead, onAddTimes }) {
   if (!now) return <div className="panel min-h-[124px]" />;
 
@@ -111,14 +156,12 @@ export default function NextClassCard({ now, courses, sessions, items, status, a
 
   if (!card) {
     return (
-      <section className="panel flex flex-col justify-center gap-2 p-4" style={{ background: "var(--brand-tint)" }} aria-label="Next class">
-        <span className="text-[11px] font-extrabold uppercase tracking-wide" style={{ color: MUTED }}>
-          Next class
-        </span>
-        <p className="text-sm" style={{ color: "var(--ink-soft)" }}>
+      <section className="hero-card flex flex-col justify-center gap-2 p-4" style={BRAND_FILL} aria-label="Next class">
+        <span className="hero-soft text-[11px] font-extrabold uppercase tracking-wide">Next class</span>
+        <p className="text-sm font-semibold">
           Add your class times once and this shows your next class, what&apos;s due for it, and Check in while it&apos;s on.
         </p>
-        <button type="button" onClick={onAddTimes} className="btn btn-soft self-start px-3.5 py-1.5 text-sm">
+        <button type="button" onClick={onAddTimes} className="btn hero-btn self-start px-3.5 py-1.5 text-sm">
           Add class times
         </button>
       </section>
@@ -136,31 +179,24 @@ export default function NextClassCard({ now, courses, sessions, items, status, a
 
   return (
     <section
-      className="panel flex flex-col gap-3 p-4 transition-shadow"
-      style={{
-        "--c": course.color,
-        // Tinted in the class color so it stands apart from the white panels around it.
-        background: "color-mix(in srgb, var(--c) 13%, var(--surface))",
-        boxShadow: highlight ? `0 0 0 2px ${course.color}, 0 8px 22px var(--shadow)` : undefined,
-      }}
+      className={`hero-card flex flex-col gap-3 p-4 ${highlight ? "hero-live" : ""}`}
+      style={{ "--c": course.color, ...heroColors(course.color) }}
       aria-label={eyebrow}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className={`text-[11px] font-extrabold uppercase tracking-wide ${highlight ? "c-text" : ""}`} style={highlight ? undefined : { color: MUTED }}>
-          {eyebrow}
-        </span>
+        <span className={`text-[11px] font-extrabold uppercase tracking-wide ${highlight ? "" : "hero-soft"}`}>{eyebrow}</span>
         {state === "later" && <Pill>in {span(start - now)}</Pill>}
         {state === "soon" && (
-          <Pill tone="class" live>
+          <Pill solid live>
             in {span(start - now)}
           </Pill>
         )}
         {state === "now" && (
-          <Pill tone="class" live>
+          <Pill solid live>
             ends in {span(end - now)}
           </Pill>
         )}
-        {state === "tomorrow" && <Pill tone="plain">{dayName}</Pill>}
+        {state === "tomorrow" && <Pill>{dayName}</Pill>}
       </div>
 
       <div>
@@ -171,15 +207,15 @@ export default function NextClassCard({ now, courses, sessions, items, status, a
           className="flex items-center gap-2 hover:underline"
           title={`Open ${course.name} in Canvas`}
         >
-          <span className="c-dot h-2.5 w-2.5 shrink-0 rounded-full" aria-hidden="true" />
-          <span className="font-display line-clamp-2 text-lg font-extrabold leading-tight tracking-tight" style={{ color: INK }}>
-            {course.name}
-          </span>
+          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-current" aria-hidden="true" />
+          <span className="font-display line-clamp-2 text-lg font-extrabold leading-tight tracking-tight">{course.name}</span>
         </a>
-        <p className="ml-[18px] mt-0.5 text-sm font-semibold tabular-nums" style={{ color: "var(--ink-soft)" }}>
+        <p className="hero-soft ml-[18px] mt-0.5 text-sm font-semibold tabular-nums">
           {code && (
             <>
-              <span className="c-text font-bold">{code}</span>
+              <span className="font-extrabold" style={{ color: "var(--hero-fg)" }}>
+                {code}
+              </span>
               {" · "}
             </>
           )}
@@ -187,8 +223,8 @@ export default function NextClassCard({ now, courses, sessions, items, status, a
           {timeText}
         </p>
         {state === "now" && (
-          <div className="c-tint mt-2 h-1.5 overflow-hidden rounded-full" aria-hidden="true">
-            <div className="c-dot h-1.5 rounded-full" style={{ width: `${progress}%` }} />
+          <div className="hero-track mt-2 h-1.5 overflow-hidden rounded-full" aria-hidden="true">
+            <div className="h-1.5 rounded-full bg-current" style={{ width: `${progress}%` }} />
           </div>
         )}
       </div>
@@ -199,7 +235,7 @@ export default function NextClassCard({ now, courses, sessions, items, status, a
           href={card.checkInUrl}
           target="_blank"
           rel="noreferrer"
-          className="btn btn-class h-11 text-[15px]"
+          className="btn hero-btn h-11 text-[15px]"
           title="Open A+ Attendance for this class"
         >
           Check in now {ArrowIcon}
@@ -212,10 +248,10 @@ export default function NextClassCard({ now, courses, sessions, items, status, a
             <Row
               href={card.urgent.url}
               icon={ClockIcon}
-              tone={TONES[due.tone]}
+              tile={TILES[due.tone]}
               title={card.urgent.title}
               sub={due.text}
-              subColor={due.tone === "gray" ? MUTED : TONES[due.tone].fg}
+              strong={due.tone !== "gray"}
             />
           )}
           {card.announcement && (
@@ -223,7 +259,7 @@ export default function NextClassCard({ now, courses, sessions, items, status, a
               href={card.announcement.url}
               onClick={() => onRead(card.announcement)}
               icon={MegaphoneIcon}
-              tone={{ bg: "var(--purple-bg)", fg: "var(--purple-fg)" }}
+              tile="hero-glass"
               title={card.announcement.title}
               sub={`Announcement · ${ago(card.announcement.postedAt, now)}`}
             />
@@ -231,14 +267,10 @@ export default function NextClassCard({ now, courses, sessions, items, status, a
         </div>
       )}
       {!card.urgent && !card.announcement && (
-        <p className="rounded-lg px-3 py-2 text-xs" style={{ background: "color-mix(in srgb, var(--surface) 70%, transparent)", color: MUTED }}>
-          Nothing due for this class this week.
-        </p>
+        <p className="hero-glass rounded-lg px-3 py-2 text-xs font-semibold">Nothing due for this class this week.</p>
       )}
       {card.moreDueThisWeek > 0 && (
-        <p className="-mt-1 text-xs" style={{ color: MUTED }}>
-          +{card.moreDueThisWeek} more due for this class this week
-        </p>
+        <p className="hero-soft -mt-1 text-xs font-semibold">+{card.moreDueThisWeek} more due for this class this week</p>
       )}
     </section>
   );

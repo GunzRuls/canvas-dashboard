@@ -416,3 +416,34 @@ details[open] > .fold-summary .fold-chevron {
 .settings-dialog { height: min(86vh, 820px); }
 @keyframes settings-fade-in { from { opacity: 0; } to { opacity: 1; } }
 .settings-fade-in { animation: settings-fade-in 0.18s ease-out both; }
+
+/* Next class card (NextClassCard.jsx): filled with a bold version of the class color so it stands
+   out from the panels around it, in light and dark. The component works out the --hero-* colors
+   for each class (white text on deep colors, dark ink text on light ones like sun and lime), so
+   these look the same in both themes. The "starting soon" / "in class" ring is the class color
+   mixed toward the page's ink, with a gap in the page color so it reads against the fill. */
+.hero-card {
+  --hero-ring: color-mix(in srgb, var(--c, var(--brand)) 65%, var(--ink));
+  background: linear-gradient(135deg, var(--hero-top), var(--hero-bot));
+  color: var(--hero-fg);
+  border-radius: 1.25rem;
+  box-shadow: 0 1px 2px var(--shadow), 0 12px 28px -14px var(--hero-bot);
+  transition: box-shadow 0.2s;
+}
+.hero-card.hero-live {
+  box-shadow: 0 0 0 3px var(--bg), 0 0 0 5.5px var(--hero-ring), 0 16px 34px -12px var(--hero-bot);
+}
+.hero-card :focus-visible { outline-color: var(--hero-fg); }
+.hero-soft { color: var(--hero-soft); }
+.hero-glass { background: var(--hero-glass); color: var(--hero-fg); }
+.hero-track { background: var(--hero-track); }
+.hero-row { transition: background-color 0.15s; }
+.hero-row:hover { background: var(--hero-hover); }
+/* Solid icon tiles for overdue / due today, readable on any class color. */
+.hero-tile-red { background: #FFFFFF; color: #B42328; }
+.hero-tile-amber { background: #FFF3D6; color: #8A5A00; }
+/* The card's one big action (Check in now, Add class times): white with class-colored text on a
+   deep fill, dark ink with class-colored text on a light one. Same press edge as other buttons. */
+.hero-btn { background: var(--hero-btn-bg); color: var(--hero-btn-fg); box-shadow: 0 3px 0 var(--hero-btn-edge); }
+.hero-btn:hover { background: var(--hero-btn-hover); }
+.hero-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--hero-btn-edge); }
