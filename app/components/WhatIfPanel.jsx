@@ -5,7 +5,12 @@ import { averageNeeded, computeGrade, groupTotals, scoreNeeded } from "@/lib/gra
 
 const INK = "var(--ink)";
 const MUTED = "var(--muted)";
-const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
+// Number boxes grow with what's typed (7.08, 98.75, 145.5) between a min and max width. Browsers
+// without field-sizing keep the fixed w-[...] fallback. The spin arrows are hidden because they
+// ate a third of the box and clipped the digits; arrow keys still step the value.
+const NUMBER_FIELD =
+  "shrink-0 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none supports-[field-sizing:content]:w-auto supports-[field-sizing:content]:[field-sizing:content]";
+const FOCUSABLE ='button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
 
 function pct(n) {
   return n === null || n === undefined ? "–" : `${n.toFixed(1)}%`;
@@ -189,9 +194,11 @@ export default function WhatIfPanel({ course, onClose }) {
                         <input
                           id="whatif-target"
                           type="number"
+                          step="any"
+                          inputMode="decimal"
                           value={target}
                           onChange={(e) => setTarget(e.target.value)}
-                          className="font-display w-16 rounded-[10px] bg-[var(--field)] px-2 py-2 text-center text-lg font-extrabold"
+                          className={`font-display rounded-[10px] bg-[var(--field)] px-2.5 py-2 text-center text-lg font-extrabold tabular-nums ${NUMBER_FIELD} min-w-[calc(3ch+20px)] max-w-[calc(6ch+20px)] w-[calc(5ch+20px)]`}
                         />
                         <span>%</span>
                       </span>
@@ -278,19 +285,20 @@ export default function WhatIfPanel({ course, onClose }) {
                               <span className="line-clamp-2 min-w-0 flex-1 break-words text-sm font-semibold sm:line-clamp-1" title={a.name}>{a.name}</span>
                               <span className="hidden sm:contents"><Badge kind={kind} /></span>
                               {a.excused ? (
-                                <span className="w-[104px] shrink-0 text-right text-sm" style={{ color: MUTED }}>–</span>
+                                <span className="w-[124px] shrink-0 text-right text-sm" style={{ color: MUTED }}>–</span>
                               ) : (
-                                <span className="flex w-[104px] shrink-0 items-center justify-end gap-1.5">
+                                <span className="flex w-[124px] shrink-0 items-center justify-end gap-1.5">
                                   <input
                                     type="number"
                                     step="any"
+                                    inputMode="decimal"
                                     value={value}
                                     placeholder="–"
                                     onChange={(e) => setScore(a.id, e.target.value)}
-                                    className="font-display w-[52px] rounded-lg bg-[var(--field)] px-1.5 py-1.5 text-center text-[15px] font-extrabold"
+                                    className={`font-display rounded-lg bg-[var(--field)] px-2 py-1.5 text-right text-[15px] font-extrabold tabular-nums ${NUMBER_FIELD} min-w-[calc(3.5ch+16px)] max-w-[calc(7ch+16px)] w-[calc(5ch+16px)]`}
                                     aria-label={`Score for ${a.name}`}
                                   />
-                                  <span className="text-[13px]" style={{ color: MUTED }}>/ {a.points}</span>
+                                  <span className="min-w-[5ch] whitespace-nowrap text-[13px] tabular-nums" style={{ color: MUTED }}>/ {a.points}</span>
                                 </span>
                               )}
                             </li>
