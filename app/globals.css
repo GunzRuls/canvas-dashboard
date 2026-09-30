@@ -1,86 +1,103 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-bricolage), var(--font-figtree), ui-sans-serif, sans-serif;
 }
 
-/* Light theme (default) */
+/* Confetti Grid theme. Light is the default; dark follows Windows or the theme toggle.
+   Every token exists in all three blocks below. Class colors live in lib/palette.js. */
 :root {
   color-scheme: light;
-  --bg: #F1F0F7;
+  --bg: #F6F3EC;
   --surface: #FFFFFF;
-  --surface-2: #E9E8F1;
-  --surface-3: #E2E0EE;
-  --field: #F1F0F7;
-  --chip: #EEEDF4;
-  --line: #E2E0EE;
-  --ink: #1C1A2E;
+  --surface-2: #F1EDE5;
+  --surface-3: #E6E0D4;
+  --hover: #FBF9F5;
+  --field: #F6F3EC;
+  --chip: #F1EDE5;
+  --line: #E3DDD0;
+  --line-2: #CFC7B6;
+  --ink: #1B1A2E;
   --ink-soft: #4A4760;
-  --muted: #6B6880;
-  --inverse: #1C1A2E;
+  --muted: #6B677D;
+  --inverse: #1B1A2E;
   --inverse-fg: #FFFFFF;
-  --red-bg: #FDE2E7;    --red-fg: #B4123E;
-  --amber-bg: #FFEFC7;  --amber-fg: #8A5300;
-  --blue-bg: #E8EEFF;   --blue-fg: #1F4FB8;
-  --green-bg: #DDF5EA;  --green-fg: #0B7A55;
-  --purple-bg: #F4E8FF; --purple-fg: #7A2DB8;
-  --orange-bg: #FFE8D6; --orange-fg: #A4410B;
-  --scroll-thumb: rgba(28, 26, 46, 0.18); --scroll-thumb-hover: rgba(28, 26, 46, 0.42);
-  --focus: #2D6CDF; --overlay: rgba(28, 26, 46, 0.4);
-  --chevron: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%2712%27 viewBox=%270 0 12 12%27%3E%3Cpath d=%27M3 4.5l3 3 3-3%27 fill=%27none%27 stroke=%27%236B6880%27 stroke-width=%271.6%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E");
+  --brand: #3355FF; --brand-hover: #4466FF; --brand-press: #2139C9;
+  --brand-tint: #E6EBFF; --brand-text: #2A45D6; --brand-ring: #D6DEFF;
+  --red-bg: #FDE8E8;    --red-fg: #B42328;
+  --amber-bg: #FFF3D6;  --amber-fg: #8A5A00;
+  --blue-bg: #E6EBFF;   --blue-fg: #2A45D6;
+  --green-bg: #E3F5EC;  --green-fg: #13784D;
+  --purple-bg: #EFEAFF; --purple-fg: #5B3FD6;
+  --orange-bg: #FFEEE3; --orange-fg: #B8490E;
+  --shadow: rgba(27, 26, 46, 0.06);
+  --scroll-thumb: rgba(27, 26, 46, 0.16); --scroll-thumb-hover: rgba(27, 26, 46, 0.36);
+  --focus: #3355FF; --overlay: rgba(27, 26, 46, 0.45);
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%2712%27 viewBox=%270 0 12 12%27%3E%3Cpath d=%27M3 4.5l3 3 3-3%27 fill=%27none%27 stroke=%27%236B677D%27 stroke-width=%271.6%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E");
 }
 
 /* Dark theme: follows Windows when you haven't picked one, or when you pick Dark */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #100F1C;
-    --surface: #1B1A2C;
-    --surface-2: #161526;
-    --surface-3: #26243B;
-    --field: #24223A;
-    --chip: #2A2842;
-    --line: #2A2842;
-    --ink: #ECEAF6;
-    --ink-soft: #C4C1D6;
-    --muted: #9A97B0;
-    --inverse: #ECEAF6;
-    --inverse-fg: #100F1C;
-    --red-bg: #3D1422;    --red-fg: #FF8FA8;
-    --amber-bg: #3A2B0B;  --amber-fg: #F7C667;
-    --blue-bg: #14244A;   --blue-fg: #93B4FF;
-    --green-bg: #0E2F24;  --green-fg: #62D9AA;
-    --purple-bg: #2B1843; --purple-fg: #CDA2FF;
-    --orange-bg: #3B1F0D; --orange-fg: #FFA873;
-    --scroll-thumb: rgba(236, 234, 246, 0.16); --scroll-thumb-hover: rgba(236, 234, 246, 0.38);
-    --focus: #93B4FF; --overlay: rgba(5, 4, 12, 0.6);
-    --chevron: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%2712%27 viewBox=%270 0 12 12%27%3E%3Cpath d=%27M3 4.5l3 3 3-3%27 fill=%27none%27 stroke=%27%239A97B0%27 stroke-width=%271.6%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E");
+    --bg: #14131F;
+    --surface: #1E1D2E;
+    --surface-2: #292839;
+    --surface-3: #34324A;
+    --hover: #242336;
+    --field: #242336;
+    --chip: #292839;
+    --line: #34324A;
+    --line-2: #46445F;
+    --ink: #F2F0FA;
+    --ink-soft: #C9C6DB;
+    --muted: #9894B0;
+    --inverse: #F2F0FA;
+    --inverse-fg: #14131F;
+    --brand: #5B78FF; --brand-hover: #6F89FF; --brand-press: #2E48D6;
+    --brand-tint: #232B55; --brand-text: #A9B8FF; --brand-ring: #2E3A70;
+    --red-bg: #3A1718;    --red-fg: #FF9C9F;
+    --amber-bg: #3A2E10;  --amber-fg: #FFD37A;
+    --blue-bg: #232B55;   --blue-fg: #A9B8FF;
+    --green-bg: #0F3325;  --green-fg: #6FE0A8;
+    --purple-bg: #2C2350; --purple-fg: #C4B5FF;
+    --orange-bg: #3A2416; --orange-fg: #FFB085;
+    --shadow: rgba(0, 0, 0, 0.35);
+    --scroll-thumb: rgba(242, 240, 250, 0.16); --scroll-thumb-hover: rgba(242, 240, 250, 0.36);
+    --focus: #7F95FF; --overlay: rgba(5, 4, 12, 0.62);
+    --chevron: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%2712%27 viewBox=%270 0 12 12%27%3E%3Cpath d=%27M3 4.5l3 3 3-3%27 fill=%27none%27 stroke=%27%239894B0%27 stroke-width=%271.6%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E");
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #100F1C;
-  --surface: #1B1A2C;
-  --surface-2: #161526;
-  --surface-3: #26243B;
-  --field: #24223A;
-  --chip: #2A2842;
-  --line: #2A2842;
-  --ink: #ECEAF6;
-  --ink-soft: #C4C1D6;
-  --muted: #9A97B0;
-  --inverse: #ECEAF6;
-  --inverse-fg: #100F1C;
-  --red-bg: #3D1422;    --red-fg: #FF8FA8;
-  --amber-bg: #3A2B0B;  --amber-fg: #F7C667;
-  --blue-bg: #14244A;   --blue-fg: #93B4FF;
-  --green-bg: #0E2F24;  --green-fg: #62D9AA;
-  --purple-bg: #2B1843; --purple-fg: #CDA2FF;
-  --orange-bg: #3B1F0D; --orange-fg: #FFA873;
-  --scroll-thumb: rgba(236, 234, 246, 0.16); --scroll-thumb-hover: rgba(236, 234, 246, 0.38);
-  --focus: #93B4FF; --overlay: rgba(5, 4, 12, 0.6);
-  --chevron: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%2712%27 viewBox=%270 0 12 12%27%3E%3Cpath d=%27M3 4.5l3 3 3-3%27 fill=%27none%27 stroke=%27%239A97B0%27 stroke-width=%271.6%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E");
+  --bg: #14131F;
+  --surface: #1E1D2E;
+  --surface-2: #292839;
+  --surface-3: #34324A;
+  --hover: #242336;
+  --field: #242336;
+  --chip: #292839;
+  --line: #34324A;
+  --line-2: #46445F;
+  --ink: #F2F0FA;
+  --ink-soft: #C9C6DB;
+  --muted: #9894B0;
+  --inverse: #F2F0FA;
+  --inverse-fg: #14131F;
+  --brand: #5B78FF; --brand-hover: #6F89FF; --brand-press: #2E48D6;
+  --brand-tint: #232B55; --brand-text: #A9B8FF; --brand-ring: #2E3A70;
+  --red-bg: #3A1718;    --red-fg: #FF9C9F;
+  --amber-bg: #3A2E10;  --amber-fg: #FFD37A;
+  --blue-bg: #232B55;   --blue-fg: #A9B8FF;
+  --green-bg: #0F3325;  --green-fg: #6FE0A8;
+  --purple-bg: #2C2350; --purple-fg: #C4B5FF;
+  --orange-bg: #3A2416; --orange-fg: #FFB085;
+  --shadow: rgba(0, 0, 0, 0.35);
+  --scroll-thumb: rgba(242, 240, 250, 0.16); --scroll-thumb-hover: rgba(242, 240, 250, 0.36);
+  --focus: #7F95FF; --overlay: rgba(5, 4, 12, 0.62);
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%2712%27 viewBox=%270 0 12 12%27%3E%3Cpath d=%27M3 4.5l3 3 3-3%27 fill=%27none%27 stroke=%27%239894B0%27 stroke-width=%271.6%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E");
 }
 
 body {
@@ -127,6 +144,38 @@ textarea::placeholder {
   color: var(--muted);
   opacity: 1;
 }
+
+/* Buttons. Primary and secondary have a small "press" edge that sinks when clicked; every kind
+   has a hover. Use these classes instead of styling buttons one by one:
+   .btn + .btn-primary | .btn-secondary | .btn-soft | .btn-danger (sizes come from Tailwind). */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border-radius: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 0.08s, box-shadow 0.08s, background-color 0.15s, color 0.15s;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.btn-primary { background: var(--brand); color: #FFFFFF; box-shadow: 0 3px 0 var(--brand-press); }
+.btn-primary:hover:not(:disabled) { background: var(--brand-hover); }
+.btn-primary:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--brand-press); }
+.btn-secondary { background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--line), 0 3px 0 var(--line); }
+.btn-secondary:hover:not(:disabled) { background: var(--hover); box-shadow: inset 0 0 0 1.5px var(--line-2), 0 3px 0 var(--line-2); }
+.btn-secondary:active:not(:disabled) { transform: translateY(2px); box-shadow: inset 0 0 0 1.5px var(--line-2), 0 1px 0 var(--line-2); }
+.btn-soft { background: var(--surface-2); color: var(--ink-soft); }
+.btn-soft:hover:not(:disabled) { background: var(--surface-3); color: var(--ink); }
+.btn-soft:active:not(:disabled) { transform: scale(0.96); }
+.btn-danger { background: var(--red-bg); color: var(--red-fg); }
+.btn-danger:hover:not(:disabled) { background: var(--red-fg); color: var(--surface); }
+.btn-danger:active:not(:disabled) { transform: scale(0.96); }
+
+/* Links styled as small text buttons. */
+.link-btn { font-weight: 700; cursor: pointer; transition: opacity 0.15s; }
+.link-btn:hover { text-decoration: underline; }
 
 /* Scrollbars: thin, rounded, no arrow buttons. The thumb is faint so you can still tell a
    panel scrolls, and it darkens and thickens while you hover or drag it. The transparent

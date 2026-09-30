@@ -447,7 +447,7 @@ export default function Dashboard({
       {/* Top bar */}
       <header className="flex flex-none flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl" style={{ color: INK }}>
+          <h1 className="font-display text-2xl font-extrabold tracking-tight sm:text-3xl" style={{ color: INK }}>
             {today}
           </h1>
           <SmartCheckIn checkIn={checkIn} />
@@ -724,7 +724,7 @@ function readSetFrom(items, announcements) {
 function PanelHeading({ id, title, children }) {
   return (
     <div className="mb-2 flex flex-none items-baseline justify-between gap-2">
-      <h2 id={id} className="truncate text-lg font-bold" style={{ color: INK }}>
+      <h2 id={id} className="font-display truncate text-xl font-extrabold tracking-tight" style={{ color: INK }}>
         {title}
       </h2>
       {children}
@@ -738,8 +738,7 @@ function TopButton({ children, onClick, disabled, strong, label }) {
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
-      className="rounded-full px-3.5 py-1.5 text-sm font-bold transition-opacity disabled:opacity-60"
-      style={strong ? { background: "var(--inverse)", color: "var(--inverse-fg)" } : { background: "var(--surface)", color: INK }}
+      className={`btn ${strong ? "btn-primary" : "btn-secondary"} h-10 px-3.5 text-sm`}
     >
       {children}
     </button>
@@ -802,7 +801,7 @@ function GradeTile({ course, active, dimmed, onSelect, onWhatIf, newGrades, onSe
         {score === null ? (
           <span className="shrink-0 whitespace-nowrap text-sm font-bold opacity-90">No grade</span>
         ) : (
-          <span className="shrink-0 text-xl font-extrabold leading-none tracking-tight">
+          <span className="font-display shrink-0 text-xl font-extrabold leading-none tracking-tight">
             {Number(score).toFixed(1)}%
             {course.grade && <span className="ml-1 text-xs font-bold opacity-90">{course.grade}</span>}
           </span>

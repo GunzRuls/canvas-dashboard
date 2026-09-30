@@ -41,6 +41,7 @@ dashboard-settings.json
 dashboard-dismissed.json
 launcher/server.log
 launcher/email.log
+launcher/port-warning.txt
 
 # vercel
 .vercel

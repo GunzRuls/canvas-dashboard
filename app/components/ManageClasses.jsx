@@ -75,12 +75,12 @@ export default function ManageClasses({ allCourses, onClose, onSaved, onError })
       <div className="relative flex h-full w-full max-w-lg flex-col bg-[var(--bg)]">
         <div className="flex items-start justify-between gap-4 p-6 pb-3">
           <div>
-            <h2 className="text-2xl font-extrabold" style={{ color: INK }}>Manage classes</h2>
+            <h2 className="font-display text-2xl font-extrabold" style={{ color: INK }}>Manage classes</h2>
             <p className="mt-1 text-sm" style={{ color: MUTED }}>
               Hidden classes disappear from the board, announcements, grades, and the morning email.
             </p>
           </div>
-          <button onClick={onClose} className="rounded-full bg-[var(--surface)] px-3 py-1 text-sm font-bold" style={{ color: INK }}>
+          <button onClick={onClose} className="btn btn-secondary px-3.5 py-1.5 text-sm">
             Close
           </button>
         </div>
@@ -201,8 +201,7 @@ export default function ManageClasses({ allCourses, onClose, onSaved, onError })
           <button
             onClick={save}
             disabled={saving}
-            className="w-full rounded-xl py-3 text-sm font-bold disabled:opacity-60"
-            style={{ background: "var(--inverse)", color: "var(--inverse-fg)" }}
+            className="btn btn-primary w-full py-3 text-sm"
           >
             {saving ? "Saving…" : "Save changes"}
           </button>

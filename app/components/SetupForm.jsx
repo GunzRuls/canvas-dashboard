@@ -135,14 +135,13 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
         ) : (
           <a
             href="/"
-            className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-bold transition-opacity hover:opacity-80"
-            style={{ background: "var(--surface)", color: INK }}
+            className="btn btn-secondary h-10 px-3.5 text-sm"
           >
             <span aria-hidden="true">←</span> Back to dashboard
           </a>
         )}
       </div>
-      <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: INK }}>
+      <h1 className="font-display text-3xl font-extrabold tracking-tight" style={{ color: INK }}>
         {firstRun ? "Welcome! Let's connect Canvas" : "Settings"}
       </h1>
       <p className="mt-2 text-sm" style={{ color: MUTED }}>
@@ -225,8 +224,7 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
               <button
                 type="button"
                 onClick={() => setEmailOff(false)}
-                className="self-start rounded-full px-4 py-1.5 text-sm font-bold"
-                style={{ background: "var(--surface-2)", color: INK }}
+                className="btn btn-soft self-start px-4 py-2 text-sm"
               >
                 Set up morning email
               </button>
@@ -244,7 +242,7 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
                     role="radio"
                     aria-checked={emailProvider === value}
                     onClick={() => setEmailProvider(value)}
-                    className="rounded-lg px-3 py-1.5 text-sm font-bold"
+                    className="rounded-lg px-3 py-1.5 text-sm font-bold transition-colors hover:text-[var(--ink)]"
                     style={emailProvider === value ? { background: "var(--surface)", color: INK } : { color: MUTED }}
                   >
                     {label}
@@ -313,7 +311,7 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
                       role="radio"
                       aria-checked={sendDays === value}
                       onClick={() => setSendDays(value)}
-                      className="rounded-lg px-3 py-1.5 text-sm font-bold"
+                      className="rounded-lg px-3 py-1.5 text-sm font-bold transition-colors hover:text-[var(--ink)]"
                       style={sendDays === value ? { background: "var(--surface)", color: INK } : { color: MUTED }}
                     >
                       {label}
@@ -331,8 +329,7 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
                   type="button"
                   onClick={sendTest}
                   disabled={testing || saving}
-                  className="rounded-full px-4 py-1.5 text-sm font-bold disabled:opacity-60"
-                  style={{ background: "var(--surface-2)", color: INK }}
+                  className="btn btn-secondary px-4 py-2 text-sm"
                 >
                   {testing ? "Checking and sending…" : "Save & send a test email"}
                 </button>
@@ -367,8 +364,7 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
           <button
             type="submit"
             disabled={saving}
-            className="rounded-full px-5 py-2 text-sm font-bold transition-opacity disabled:opacity-60"
-            style={{ background: "var(--inverse)", color: "var(--inverse-fg)" }}
+            className="btn btn-primary px-6 py-2.5 text-sm"
           >
             {saving ? "Checking with Canvas…" : firstRun ? "Connect and open dashboard" : "Save"}
           </button>
@@ -406,7 +402,7 @@ function Maintenance({ installed, version }) {
 
   return (
     <section className="mt-8 rounded-2xl p-5" style={{ background: "var(--surface)" }}>
-      <span className="text-lg font-extrabold" style={{ color: INK }}>
+      <span className="font-display text-lg font-extrabold" style={{ color: INK }}>
         {installed ? "Update or uninstall" : "Reinstall or uninstall"}
       </span>
       <p className="mt-2 text-sm" style={{ color: MUTED }}>
@@ -420,8 +416,7 @@ function Maintenance({ installed, version }) {
             href={RELEASES_URL}
             target="_blank"
             rel="noreferrer"
-            className="rounded-full px-4 py-1.5 text-sm font-bold"
-            style={{ background: "var(--surface-2)", color: INK }}
+            className="btn btn-secondary px-4 py-2 text-sm"
           >
             Get the latest version
           </a>
@@ -430,8 +425,7 @@ function Maintenance({ installed, version }) {
             type="button"
             disabled={busy}
             onClick={() => run("reinstall", "Reinstall the dashboard? It closes, reinstalls, and opens again. This takes a few minutes.")}
-            className="rounded-full px-4 py-1.5 text-sm font-bold disabled:opacity-60"
-            style={{ background: "var(--surface-2)", color: INK }}
+            className="btn btn-secondary px-4 py-2 text-sm"
           >
             Reinstall
           </button>
@@ -440,8 +434,7 @@ function Maintenance({ installed, version }) {
           type="button"
           disabled={busy}
           onClick={() => run("uninstall", "Open the uninstaller? You'll confirm each step in its window.")}
-          className="rounded-full px-4 py-1.5 text-sm font-bold disabled:opacity-60"
-          style={{ background: "var(--red-bg)", color: "var(--red-fg)" }}
+          className="btn btn-danger px-4 py-2 text-sm"
         >
           Uninstall…
         </button>
@@ -459,7 +452,7 @@ function Section({ title, note, open = true, status, warning, onRemove, removeLa
   const body = <div className="mt-3 flex flex-col gap-3">{children}</div>;
   const heading = (
     <span className="flex flex-wrap items-baseline gap-2">
-      <span className="text-lg font-extrabold" style={{ color: INK }}>
+      <span className="font-display text-lg font-extrabold" style={{ color: INK }}>
         {title}
       </span>
       <span className="text-xs font-bold uppercase tracking-wide" style={{ color: MUTED }}>

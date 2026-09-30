@@ -71,7 +71,7 @@ export default function WhatIfPanel({ course, onClose }) {
         <div className="p-6 text-white" style={{ background: course.color }}>
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-extrabold leading-tight">{course.name}</h2>
+              <h2 className="font-display text-2xl font-extrabold leading-tight">{course.name}</h2>
               <p className="text-sm font-semibold opacity-85">{course.code}</p>
             </div>
             <button onClick={onClose} className="rounded-full bg-white/20 px-3 py-1 text-sm font-bold hover:bg-white/35">
@@ -81,7 +81,7 @@ export default function WhatIfPanel({ course, onClose }) {
           <div className="mt-5 flex items-end gap-8">
             <div>
               <p className="text-sm font-semibold opacity-85">{edited ? "Projected" : "Current"}</p>
-              <p className="text-5xl font-extrabold leading-none tracking-tight">{pct(projected)}</p>
+              <p className="font-display text-5xl font-extrabold leading-none tracking-tight">{pct(projected)}</p>
             </div>
             <div>
               <p className="text-sm font-semibold opacity-85">Canvas shows</p>

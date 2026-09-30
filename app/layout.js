@@ -1,9 +1,14 @@
-import { Bricolage_Grotesque } from "next/font/google";
+import { Bricolage_Grotesque, Figtree } from "next/font/google";
 import "./globals.css";
 import KeepAlive from "./components/KeepAlive";
 
+// Figtree for everyday text, Bricolage Grotesque for headlines and numbers (class "font-display").
 const bricolage = Bricolage_Grotesque({
   variable: "--font-bricolage",
+  subsets: ["latin"],
+});
+const figtree = Figtree({
+  variable: "--font-figtree",
   subsets: ["latin"],
 });
 
@@ -17,7 +22,7 @@ const themeScript = `try{var t=localStorage.getItem("dashboard-theme");if(t)docu
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={`${bricolage.variable} h-full antialiased`} suppressHydrationWarning>
+    <html lang="en" className={`${bricolage.variable} ${figtree.variable} h-full antialiased`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>

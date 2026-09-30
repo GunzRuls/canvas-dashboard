@@ -415,7 +415,7 @@ function Card({ children }) {
 
 function Title({ children }) {
   return (
-    <h1 className="mt-3 text-2xl font-extrabold tracking-tight sm:text-3xl" style={{ color: INK }}>
+    <h1 className="font-display mt-3 text-2xl font-extrabold tracking-tight sm:text-3xl" style={{ color: INK }}>
       {children}
     </h1>
   );
@@ -448,8 +448,7 @@ function Primary({ children, type = "button", ...rest }) {
   return (
     <button
       type={type}
-      className="rounded-full px-5 py-2 text-sm font-bold transition-opacity hover:opacity-90 disabled:opacity-60"
-      style={{ background: "var(--inverse)", color: "var(--inverse-fg)" }}
+      className="btn btn-primary px-5 py-2.5 text-sm"
       {...rest}
     >
       {children}
@@ -461,8 +460,7 @@ function Secondary({ children, ...rest }) {
   return (
     <button
       type="button"
-      className="rounded-full px-4 py-2 text-sm font-bold transition-opacity hover:opacity-80"
-      style={{ background: "var(--surface-2)", color: INK }}
+      className="btn btn-secondary px-4 py-2.5 text-sm"
       {...rest}
     >
       {children}

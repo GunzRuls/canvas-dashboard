@@ -13,6 +13,23 @@ const nextConfig = {
   outputFileTracingExcludes: {
     "/**": ["./.env*", "./dashboard-*.json", "./launcher/*.log"],
   },
+  // Browser protections on every response (proxy.js handles who may send requests):
+  // no framing by other sites (clickjacking, e.g. a hidden Uninstall click), no other site
+  // loading our files, no guessing file types, and no localhost addresses sent to Canvas.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+          { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "no-referrer" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

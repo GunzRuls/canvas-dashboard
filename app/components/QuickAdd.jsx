@@ -77,8 +77,7 @@ export default function QuickAdd({ courses, onAdded, onError }) {
       <button
         type="submit"
         disabled={saving || !title.trim()}
-        className="rounded-lg px-3 py-1.5 text-sm font-bold disabled:opacity-50"
-        style={{ background: "var(--inverse)", color: "var(--inverse-fg)" }}
+        className="btn btn-primary px-3.5 py-1.5 text-sm"
       >
         {saving ? "Adding…" : "Add to-do"}
       </button>

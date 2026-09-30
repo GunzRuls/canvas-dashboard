@@ -63,7 +63,7 @@ function CanvasProblem({ title, body, action }) {
   return (
     <main className="mx-auto flex min-h-screen max-w-lg items-center px-4">
       <div className="w-full rounded-2xl p-6" style={{ background: "var(--surface)" }}>
-        <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: "var(--ink)" }}>
+        <h1 className="font-display text-2xl font-extrabold tracking-tight" style={{ color: "var(--ink)" }}>
           {title}
         </h1>
         <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--ink-soft)" }}>
@@ -72,16 +72,14 @@ function CanvasProblem({ title, body, action }) {
         <div className="mt-5 flex flex-wrap items-center gap-2">
           <a
             href={action.href}
-            className="rounded-full px-4 py-2 text-sm font-bold transition-opacity hover:opacity-85"
-            style={{ background: "var(--inverse)", color: "var(--inverse-fg)" }}
+            className="btn btn-primary px-4 py-2 text-sm"
           >
             {action.label}
           </a>
           {action.href !== "/setup" && !action.href.startsWith("/setup?") && (
             <a
               href="/setup"
-              className="rounded-full px-4 py-2 text-sm font-bold transition-opacity hover:opacity-85"
-              style={{ background: "var(--surface-2)", color: "var(--ink)" }}
+              className="btn btn-secondary px-4 py-2 text-sm"
             >
               Settings
             </a>

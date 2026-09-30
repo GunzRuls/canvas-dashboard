@@ -5,7 +5,7 @@ export default function Loading() {
       <div className="flex flex-col items-center text-center" role="status" aria-live="polite">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/icon.png" alt="" width={72} height={72} className="loading-float rounded-2xl" />
-        <p className="mt-5 text-lg font-extrabold tracking-tight" style={{ color: "var(--ink)" }}>
+        <p className="font-display mt-5 text-lg font-extrabold tracking-tight" style={{ color: "var(--ink)" }}>
           School Dashboard
         </p>
         <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
