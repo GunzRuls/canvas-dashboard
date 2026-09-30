@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { PALETTE } from "@/lib/palette";
-import ClassTimes, { EMPTY_TIMES, isBlank, timesProblem } from "./ClassTimes";
+import { ClassTimesRow, EMPTY_TIMES, isBlank, timesProblem } from "./ClassTimes";
 
 const INK = "var(--ink)";
 const MUTED = "var(--muted)";
@@ -53,14 +53,17 @@ function useDialog(ref, onClose) {
   }, [ref]);
 }
 
-// Hide classes you don't need, give them shorter names, and pick their colors.
+// Set when each class meets (right in its row), hide classes you don't need, and use Edit for the
+// rarer stuff: a shorter name, the color, and the attendance link.
 export default function ManageClasses({ allCourses, onClose, onSaved, onError }) {
+  // Shown classes first (sorted once on open, so a row doesn't jump when you flip its switch).
   const [rows, setRows] = useState(() =>
-    allCourses.map((c) => ({
+    [...allCourses].sort((a, b) => Number(Boolean(a.hidden)) - Number(Boolean(b.hidden))).map((c) => ({
       id: c.id,
       canvasName: c.canvasName,
+      defaultName: c.defaultName || c.canvasName, // Canvas name without the term suffix
       code: c.code,
-      name: c.name === c.canvasName ? "" : c.name,
+      name: c.customName ?? (c.name === c.canvasName ? "" : c.name), // only your own rename
       color: c.color,
       show: !c.hidden,
       attendance: c.customAttendanceUrl || "",
@@ -77,12 +80,12 @@ export default function ManageClasses({ allCourses, onClose, onSaved, onError })
   const update = (id, changes) => setRows((r) => r.map((row) => (row.id === id ? { ...row, ...changes } : row)));
 
   async function save() {
-    // A class with half-entered times opens so you can see what to fix.
-    const broken = rows.find((r) => timesProblem(r.schedule));
+    // A shown class with half-entered times scrolls into view so you can see what to fix.
+    const broken = rows.find((r) => r.show && timesProblem(r.schedule));
     if (broken) {
       setChecked(true);
-      setOpenId(broken.id);
-      onError(`Check the class times for ${broken.name.trim() || broken.canvasName}. ${timesProblem(broken.schedule)}`);
+      document.getElementById(`class-row-${broken.id}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      onError(`Check the class times for ${broken.name.trim() || broken.defaultName}. ${timesProblem(broken.schedule)}`);
       return;
     }
     setSaving(true);
@@ -99,7 +102,7 @@ export default function ManageClasses({ allCourses, onClose, onSaved, onError })
           ),
           schedule: Object.fromEntries(
             rows
-              .filter((r) => !isBlank(r.schedule))
+              .filter((r) => !isBlank(r.schedule) && !timesProblem(r.schedule)) // hidden classes' unfinished times are dropped
               .map((r) => [r.id, r.schedule])
           ),
         }),
@@ -124,7 +127,7 @@ export default function ManageClasses({ allCourses, onClose, onSaved, onError })
         aria-modal="true"
         aria-labelledby="manage-title"
         tabIndex={-1}
-        className="modal-in relative flex max-h-full w-full max-w-[680px] flex-col"
+        className="modal-in relative flex max-h-full w-full max-w-[960px] flex-col"
         style={{ outline: "none" }}
       >
         <div
@@ -140,7 +143,8 @@ export default function ManageClasses({ allCourses, onClose, onSaved, onError })
             <div className="min-w-0">
               <h2 id="manage-title" className="font-display text-[26px] font-extrabold leading-tight">Manage classes</h2>
               <p className="mt-1 text-sm" style={{ color: MUTED }}>
-                Rename, recolor, or hide a class, and set when it meets. Hidden classes disappear everywhere, including the email.
+                Pick the days and times each class meets (for the Next class card and Check in). Leave a class empty to
+                skip it. Edit renames or recolors a class; the switch hides it everywhere, including the email.
               </p>
             </div>
             <button onClick={onClose} className="btn btn-secondary shrink-0 px-3.5 py-2 text-[13px]">
@@ -149,61 +153,71 @@ export default function ManageClasses({ allCourses, onClose, onSaved, onError })
           </div>
 
           <div className="flex min-h-48 flex-1 flex-col overflow-y-auto px-2 pb-2 sm:px-4">
-            {rows.map((r) => {
+            {rows.map((r, i) => {
               const open = openId === r.id;
-              const display = r.name.trim() || r.canvasName;
-              const sub = r.name.trim() ? r.canvasName : r.code;
+              const display = r.name.trim() || r.defaultName;
+              const sub = r.code || (r.name.trim() ? r.defaultName : "");
               return (
                 <div
                   key={r.id}
-                  className={`flex flex-col gap-2.5 rounded-[14px] px-2.5 py-2.5 ${open ? "" : "row-hover"}`}
-                  style={{ "--c": r.color, background: open ? "var(--hover)" : undefined }}
+                  className={`flex flex-col gap-2.5 px-2.5 py-3 ${i ? "border-t border-[var(--chip)]" : ""}`}
+                  style={{ "--c": r.color }}
                 >
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setOpenId(open ? null : r.id)}
-                      aria-label={`Edit ${display}`}
-                      tabIndex={-1}
-                      className="c-tint flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px]"
-                    >
-                      <span className="c-dot h-3.5 w-3.5 rounded-full" />
-                    </button>
-                    <div className="min-w-0 flex-1" style={{ opacity: r.show ? 1 : 0.45 }}>
-                      <p className="truncate text-[15px] font-bold">{display}</p>
-                      <p className="truncate text-xs" style={{ color: MUTED }}>
-                        {sub}
-                        {r.show ? "" : " · hidden"}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setOpenId(open ? null : r.id)}
-                      aria-expanded={open}
-                      className="btn btn-soft shrink-0 px-3 py-1.5 text-xs"
-                    >
-                      {open ? "Done" : "Edit"}
-                    </button>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={r.show}
-                      aria-label={`Show ${display}`}
-                      onClick={() => update(r.id, { show: !r.show })}
-                      className="modal-switch shrink-0"
-                    >
-                      <span className="modal-knob" />
-                    </button>
-                  </div>
+                  <ClassTimesRow
+                    id={`class-row-${r.id}`}
+                    wide
+                    name={display}
+                    sub={`${sub}${r.show ? "" : " · hidden"}`}
+                    color={r.color}
+                    dim={!r.show}
+                    noTimes={!r.show}
+                    value={r.schedule}
+                    onChange={(schedule) => update(r.id, { schedule })}
+                    problem={checked && r.show ? timesProblem(r.schedule) : ""}
+                    lead={
+                      <button
+                        type="button"
+                        onClick={() => setOpenId(open ? null : r.id)}
+                        aria-label={`Edit ${display}`}
+                        tabIndex={-1}
+                        className="c-tint flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px]"
+                      >
+                        <span className="c-dot h-3.5 w-3.5 rounded-full" />
+                      </button>
+                    }
+                    actions={
+                      <div className="flex flex-none items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setOpenId(open ? null : r.id)}
+                          aria-expanded={open}
+                          aria-label={open ? `Done editing ${display}` : `Edit name and color for ${display}`}
+                          className="btn btn-soft min-w-[3.25rem] justify-center px-3 py-1.5 text-xs"
+                        >
+                          {open ? "Done" : "Edit"}
+                        </button>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={r.show}
+                          aria-label={`Show ${display}`}
+                          onClick={() => update(r.id, { show: !r.show })}
+                          className="modal-switch"
+                        >
+                          <span className="modal-knob" />
+                        </button>
+                      </div>
+                    }
+                  />
 
                   {open && (
-                    <div className="flex flex-col gap-3 rounded-[14px] bg-[var(--bg)] p-3.5 sm:ml-[46px]">
+                    <div className="step-in flex flex-col gap-3 rounded-[14px] bg-[var(--bg)] p-3.5 sm:ml-[46px]">
                       <label className="flex flex-col gap-1.5 text-[13px] font-bold">
                         Display name
                         <input
                           value={r.name}
                           onChange={(e) => update(r.id, { name: e.target.value })}
-                          placeholder={r.canvasName}
+                          placeholder={r.defaultName}
                           className={fieldClass}
                           style={{ color: INK }}
                         />
@@ -243,27 +257,6 @@ export default function ManageClasses({ allCourses, onClose, onSaved, onError })
                           style={{ color: INK }}
                         />
                       </label>
-                      <div className="flex flex-col gap-1.5">
-                        <span className="text-[13px] font-bold">
-                          Class times{" "}
-                          <span className="font-normal" style={{ color: MUTED }}>
-                            (for the Next class card and Check in)
-                          </span>
-                        </span>
-                        <ClassTimes
-                          value={r.schedule}
-                          onChange={(schedule) => update(r.id, { schedule })}
-                          color={r.color}
-                          label={display}
-                          fieldBg="var(--surface)"
-                          invalid={checked && Boolean(timesProblem(r.schedule))}
-                        />
-                        {checked && timesProblem(r.schedule) && (
-                          <p className="text-xs font-bold" style={{ color: "var(--red-fg)" }}>
-                            {timesProblem(r.schedule)}
-                          </p>
-                        )}
-                      </div>
                     </div>
                   )}
                 </div>

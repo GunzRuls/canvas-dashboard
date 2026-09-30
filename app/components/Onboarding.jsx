@@ -1,17 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Input, CanvasAddressHelp, TokenHelp, GmailHelp, ResendHelp } from "./setupHelp";
 import { CalendarLinkField } from "./CalendarSettings";
-import ClassTimes, { EMPTY_TIMES, isBlank, timesProblem } from "./ClassTimes";
+import { ClassTimesRow, EMPTY_TIMES, isBlank, timesProblem } from "./ClassTimes";
 
-// First launch: a step-by-step setup instead of one long form. Canvas is required; the
-// class times, calendar and email steps can be skipped. Each save goes through /api/config, which checks
+// First launch: a step-by-step setup instead of one long form. Canvas is required; class times
+// (listed right after Canvas connects), the calendar and email can be skipped. Each save goes through /api/config, which checks
 // Canvas (and calendar links) before anything is stored. Later changes happen in Settings.
 
 const INK = "var(--ink)";
 const MUTED = "var(--muted)";
-const STEPS = ["welcome", "school", "connect", "classes", "calendar", "email", "look", "done"];
+const STEPS = ["welcome", "school", "connect", "calendar", "email", "look", "done"];
 
 export default function Onboarding() {
   const [step, setStep] = useState(0);
@@ -30,21 +30,15 @@ export default function Onboarding() {
   const [sendTime, setSendTime] = useState("07:00");
   const [sendDays, setSendDays] = useState("weekdays");
   const [emailSaved, setEmailSaved] = useState(false);
-  const [timezone, setTimezone] = useState("America/New_York");
   const [theme, setTheme] = useState("system");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    try {
-      setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || "America/New_York");
-      const saved = localStorage.getItem("dashboard-theme");
-      if (saved) setTheme(saved);
-    } catch {}
-  }, []);
-
   const go = (n) => {
     setError("");
+    // The theme picker starts on whatever is saved in this browser (read here, not during render,
+    // so the server and browser render the same page).
+    if (STEPS[n] === "look") setTheme(savedTheme());
     setStep(n);
   };
   const next = () => go(step + 1);
@@ -58,7 +52,7 @@ export default function Onboarding() {
       const res = await fetch("/api/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ canvasBaseUrl, timezone, ...extra }),
+        body: JSON.stringify({ canvasBaseUrl, timezone: browserTimezone(), ...extra }),
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "That didn't save.");
@@ -100,19 +94,13 @@ export default function Onboarding() {
 
   function chooseTheme(value) {
     setTheme(value);
-    try {
-      if (value === "system") {
-        localStorage.removeItem("dashboard-theme");
-        delete document.documentElement.dataset.theme;
-      } else {
-        localStorage.setItem("dashboard-theme", value);
-        document.documentElement.dataset.theme = value;
-      }
-    } catch {}
+    applyTheme(value);
   }
 
   const name = STEPS[step];
   const progress = step / (STEPS.length - 1);
+  // The card widens once Canvas connects, so each class fits on one line with its days and times.
+  const wide = name === "connect" && connected;
 
   return (
     <main className="flex min-h-screen flex-col">
@@ -120,7 +108,10 @@ export default function Onboarding() {
         <div className="h-full transition-[width] duration-300" style={{ width: `${progress * 100}%`, background: "var(--focus)" }} />
       </div>
 
-      <div className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center px-4 py-10">
+      <div
+        className="mx-auto flex w-full flex-1 flex-col justify-center px-4 py-10"
+        style={{ maxWidth: wide ? 840 : 512, transition: "max-width 0.35s ease" }}
+      >
         {step > 0 && step < STEPS.length - 1 && (
           <p className="mb-3 text-xs font-bold uppercase tracking-wide" style={{ color: MUTED }}>
             Step {step} of {STEPS.length - 2}
@@ -189,57 +180,40 @@ export default function Onboarding() {
             </form>
           )}
 
-          {name === "connect" && (
+          {name === "connect" && !connected && (
             <form onSubmit={connect}>
               <Card>
                 <Title>Connect your Canvas account</Title>
                 <Lead>Canvas gives you a private key, called an access token, for apps like this one.</Lead>
-                {connected ? (
-                  <div className="mt-4 rounded-xl px-4 py-3 text-sm" style={{ background: "var(--green-bg)", color: "var(--green-fg)" }}>
-                    <p className="font-extrabold">✓ Connected{connected.name ? ` as ${connected.name}` : ""}</p>
-                    {connected.classes != null && (
-                      <p className="mt-0.5 font-semibold">
-                        Found {connected.classes} {connected.classes === 1 ? "class" : "classes"} this term.
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <>
-                    <div className="mt-4">
-                      <TokenHelp canvasBaseUrl={canvasBaseUrl} inline />
-                    </div>
-                    <Input
-                      type="password"
-                      value={canvasToken}
-                      onChange={setCanvasToken}
-                      placeholder="Paste your token here"
-                      required
-                      autoFocus
-                      className="mt-4 !py-2.5 !text-base"
-                      aria-label="Canvas access token"
-                    />
-                  </>
-                )}
+                <div className="mt-4">
+                  <TokenHelp canvasBaseUrl={canvasBaseUrl} inline />
+                </div>
+                <Input
+                  type="password"
+                  value={canvasToken}
+                  onChange={setCanvasToken}
+                  placeholder="Paste your token here"
+                  required
+                  autoFocus
+                  className="mt-4 !py-2.5 !text-base"
+                  aria-label="Canvas access token"
+                />
                 <ErrorNote text={error} />
                 <Actions>
                   <Secondary onClick={back}>Back</Secondary>
-                  {connected ? (
-                    <Primary onClick={next}>Next</Primary>
-                  ) : (
-                    <Primary type="submit" disabled={busy}>
-                      {busy ? "Checking with Canvas…" : "Connect"}
-                    </Primary>
-                  )}
+                  <Primary type="submit" disabled={busy}>
+                    {busy ? "Checking with Canvas…" : "Connect"}
+                  </Primary>
                 </Actions>
               </Card>
             </form>
           )}
 
-          {name === "classes" && (
-            <ClassesStep
+          {name === "connect" && connected && (
+            <ClassesList
+              connected={connected}
               back={back}
               skip={next}
-              saved={classTimes}
               onSaved={(count) => {
                 setClassTimes(count);
                 next();
@@ -414,6 +388,8 @@ export default function Onboarding() {
                 and change class times with <b>Manage classes</b>.
               </p>
               <Actions>
+                {/* A full page load on purpose: the whole app starts fresh with the new settings. */}
+                {/* eslint-disable-next-line @next/next/no-location-assign-relative-destination */}
                 <Primary onClick={() => window.location.assign("/")}>Open my dashboard</Primary>
               </Actions>
             </Card>
@@ -424,6 +400,34 @@ export default function Onboarding() {
   );
 }
 
+// This computer's time zone, so the morning email and "today" match your clock.
+function browserTimezone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "America/New_York";
+  } catch {
+    return "America/New_York";
+  }
+}
+
+function savedTheme() {
+  try {
+    return localStorage.getItem("dashboard-theme") || "system";
+  } catch {
+    return "system";
+  }
+}
+
+// Saves the theme and switches the page to it right away ("system" follows Windows).
+function applyTheme(value) {
+  const root = document.documentElement;
+  try {
+    if (value === "system") localStorage.removeItem("dashboard-theme");
+    else localStorage.setItem("dashboard-theme", value);
+  } catch {}
+  if (value === "system") root.removeAttribute("data-theme");
+  else root.setAttribute("data-theme", value);
+}
+
 async function fetchClasses() {
   const res = await fetch("/api/settings");
   const data = await res.json();
@@ -431,9 +435,11 @@ async function fetchClasses() {
   return data;
 }
 
-// "When are your classes?" Canvas at most schools doesn't list meeting times, so they're entered
-// once per semester. Saving sends only class times and hidden classes; names and colors are kept.
-function ClassesStep({ back, skip, saved, onSaved }) {
+// Right after Canvas connects: a "Connected" check pops in, then your classes are listed one per
+// row with day toggles and times next to each. Canvas at most schools doesn't list meeting times, so
+// they're entered once per semester. Saving sends only class times and hidden classes; names and
+// colors are kept.
+function ClassesList({ connected, back, skip, onSaved }) {
   const [rows, setRows] = useState(null); // [{ id, name, code, color, hidden, times }]
   const [before, setBefore] = useState({ schedule: {}, hidden: [] }); // what's already saved
   const [loadError, setLoadError] = useState("");
@@ -441,6 +447,7 @@ function ClassesStep({ back, skip, saved, onSaved }) {
   const [checked, setChecked] = useState(false); // show problems only after a save try
   const [busy, setBusy] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
+  const headingRef = useRef(null);
 
   const load = () =>
     fetchClasses().then(
@@ -454,11 +461,14 @@ function ClassesStep({ back, skip, saved, onSaved }) {
 
   useEffect(() => {
     load();
+    // The token field and Connect button just went away, so keep keyboard focus on this card.
+    headingRef.current?.focus();
   }, []);
 
   const update = (id, changes) => setRows((r) => r.map((row) => (row.id === id ? { ...row, ...changes } : row)));
   const classes = (rows || []).filter((r) => !r.hidden);
   const notClasses = (rows || []).filter((r) => r.hidden);
+  const count = connected.classes;
 
   async function submit(e) {
     e.preventDefault();
@@ -493,19 +503,62 @@ function ClassesStep({ back, skip, saved, onSaved }) {
     }
   }
 
+  const link = "text-xs font-bold hover:underline";
+
   return (
     <form onSubmit={submit} noValidate>
+      <style>{CONNECTED_MOTION}</style>
       <Card>
-        <Title>When are your classes?</Title>
+        <div
+          role="status"
+          className="ob-banner flex items-center gap-3 rounded-xl px-4 py-3 text-sm"
+          style={{ background: "var(--green-bg)", color: "var(--green-fg)" }}
+        >
+          <span
+            className="ob-pop flex h-8 w-8 flex-none items-center justify-center rounded-full"
+            style={{ background: "var(--green-fg)" }}
+            aria-hidden="true"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path
+                className="ob-check"
+                d="M3.5 8.5l3 3 6-7"
+                stroke="var(--green-bg)"
+                strokeWidth="2.25"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
+          <p className="min-w-0">
+            <span className="font-extrabold">Connected{connected.name ? ` as ${connected.name}` : ""}</span>
+            {count != null && (
+              <span className="font-semibold">
+                {" · "}found {count} {count === 1 ? "class" : "classes"}
+              </span>
+            )}
+          </p>
+        </div>
+
+        <h1
+          ref={headingRef}
+          tabIndex={-1}
+          className="font-display mt-5 text-2xl font-extrabold tracking-tight sm:text-3xl"
+          style={{ color: INK, outline: "none" /* focused by code, not by the user: no ring */ }}
+        >
+          When are your classes?
+        </h1>
         <Lead>
           Canvas doesn&apos;t list class times, so add them once per semester. They power the <b>Next class</b> card
           and <b>Check in</b>. Leave a class empty to skip it. You can change these later in Manage classes.
         </Lead>
 
         {!rows && !loadError && (
-          <p className="mt-5 text-sm" style={{ color: MUTED }} role="status">
-            Loading your classes…
-          </p>
+          <div className="mt-5 flex flex-col gap-3" role="status" aria-label="Loading your classes">
+            {[0, 1, 2].map((i) => (
+              <span key={i} className="h-9 animate-pulse rounded-lg" style={{ background: "var(--field)" }} />
+            ))}
+          </div>
         )}
         {loadError && (
           <>
@@ -517,60 +570,50 @@ function ClassesStep({ back, skip, saved, onSaved }) {
         )}
 
         {rows && (
-          <ul className="mt-5 flex flex-col gap-5">
+          <ul className="mt-4">
             {classes.map((r, i) => {
               const above = classes[i - 1];
-              const problem = checked ? timesProblem(r.times) : "";
               return (
-                <li key={r.id} className="flex flex-col gap-2" style={{ "--c": r.color }}>
-                  <div className="flex items-center gap-2.5">
-                    <span className="c-dot h-2.5 w-2.5 flex-none rounded-full" aria-hidden="true" />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold" style={{ color: INK }}>
-                        {r.name}
-                      </p>
-                      {r.code && r.code !== r.name && (
-                        <p className="truncate text-xs" style={{ color: MUTED }}>
-                          {r.code}
-                        </p>
-                      )}
-                    </div>
-                    {above && !isBlank(above.times) && (
-                      <button
-                        type="button"
-                        onClick={() => update(r.id, { times: { ...above.times, days: [...above.times.days] } })}
-                        className="btn btn-soft flex-none rounded-md px-2.5 py-1 text-xs"
-                        aria-label={`Same times as ${above.name}`}
-                      >
-                        Same as above
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => update(r.id, { hidden: true })}
-                      className="btn btn-soft flex-none rounded-md px-2.5 py-1 text-xs"
-                      aria-label={`${r.name} isn't a class. Hide it`}
-                    >
-                      Not a class
-                    </button>
-                  </div>
-                  <ClassTimes
+                <li
+                  key={r.id}
+                  className={`ob-rise py-3 ${i ? "border-t border-[var(--chip)]" : ""}`}
+                  style={{ animationDelay: `${250 + Math.min(i, 8) * 45}ms` }}
+                >
+                  <ClassTimesRow
+                    name={r.name}
+                    sub={r.code && r.code !== r.name ? r.code : ""}
+                    color={r.color}
                     value={r.times}
                     onChange={(times) => update(r.id, { times })}
-                    color={r.color}
-                    label={r.name}
-                    invalid={Boolean(problem)}
+                    problem={checked ? timesProblem(r.times) : ""}
+                    below={
+                      <div className="mt-0.5 flex flex-wrap gap-x-3" style={{ color: MUTED }}>
+                        {above && !isBlank(above.times) && !timesProblem(above.times) && isBlank(r.times) && (
+                          <button
+                            type="button"
+                            onClick={() => update(r.id, { times: { ...above.times, days: [...above.times.days] } })}
+                            className={link}
+                            aria-label={`Same times as ${above.name}`}
+                          >
+                            Same as above
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => update(r.id, { hidden: true })}
+                          className={link}
+                          aria-label={`${r.name} isn't a class. Hide it`}
+                        >
+                          Not a class
+                        </button>
+                      </div>
+                    }
                   />
-                  {problem && (
-                    <p className="text-xs font-bold" style={{ color: "var(--red-fg)" }}>
-                      {problem}
-                    </p>
-                  )}
                 </li>
               );
             })}
             {!classes.length && (
-              <li className="text-sm" style={{ color: MUTED }}>
+              <li className="py-3 text-sm" style={{ color: MUTED }}>
                 No classes to set up.
               </li>
             )}
@@ -578,7 +621,7 @@ function ClassesStep({ back, skip, saved, onSaved }) {
         )}
 
         {notClasses.length > 0 && (
-          <div className="mt-5 rounded-xl px-4 py-3" style={{ background: "var(--surface-2)" }}>
+          <div className="mt-3 rounded-xl px-4 py-3" style={{ background: "var(--surface-2)" }}>
             <button
               type="button"
               onClick={() => setShowHidden(!showHidden)}
@@ -586,7 +629,7 @@ function ClassesStep({ back, skip, saved, onSaved }) {
               className="text-sm font-bold hover:underline"
               style={{ color: "var(--ink-soft)" }}
             >
-              <span aria-hidden="true">{showHidden ? "▾" : "▸"}</span> Hidden, not a class ({notClasses.length})
+              <span aria-hidden="true">{showHidden ? "▾" : "▸"}</span> Hidden ({notClasses.length})
             </button>
             {showHidden && (
               <ul className="mt-2 flex flex-col gap-1.5">
@@ -613,14 +656,27 @@ function ClassesStep({ back, skip, saved, onSaved }) {
         <Actions>
           <Secondary onClick={back}>Back</Secondary>
           <Primary type="submit" disabled={busy || !rows}>
-            {busy ? "Saving…" : saved != null ? "Save again" : "Save class times"}
+            {busy ? "Saving…" : "Save and continue"}
           </Primary>
-          <Skip onClick={skip}>{saved != null ? "Next" : "Skip for now"}</Skip>
+          <Skip onClick={skip}>Skip for now</Skip>
         </Actions>
       </Card>
     </form>
   );
 }
+
+// The "Connected" pop-in: the banner rises, the badge pops, the check draws itself, and the class
+// rows rise in one after another. Kept here because only this screen uses it. The global
+// reduced-motion rule turns all of it off, and the resting state is the finished look.
+const CONNECTED_MOTION = `
+@keyframes ob-pop { 0% { transform: scale(0.3); opacity: 0; } 60% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes ob-check { from { stroke-dashoffset: 14; } to { stroke-dashoffset: 0; } }
+@keyframes ob-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.ob-banner { animation: ob-rise 0.3s ease-out both; }
+.ob-pop { animation: ob-pop 0.45s 0.1s cubic-bezier(0.3, 1.4, 0.5, 1) both; }
+.ob-check { stroke-dasharray: 14; animation: ob-check 0.3s 0.4s ease-out both; }
+.ob-rise { animation: ob-rise 0.3s ease-out both; }
+`;
 
 function Card({ children }) {
   return (

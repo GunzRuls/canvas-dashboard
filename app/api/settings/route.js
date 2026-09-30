@@ -13,6 +13,8 @@ export async function GET() {
       id: c.id,
       name: c.name,
       canvasName: c.canvasName,
+      defaultName: c.defaultName,
+      customName: c.customName,
       code: c.code,
       color: c.color,
       hidden: c.hidden,
