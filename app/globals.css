@@ -407,3 +407,12 @@ details[open] > .fold-summary .fold-chevron {
    above stops the pulse. */
 @keyframes settings-skeleton { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
 .settings-skeleton { animation: settings-skeleton 1.4s ease-in-out infinite; }
+
+/* Settings pop-up size and fade (SettingsModal.jsx, SetupForm.jsx). The pop-up has its final
+   height from the first frame, and the loading placeholders fill that same box, so nothing
+   resizes when the settings arrive: they fade in over the placeholders instead (also the
+   "Connected as" card and the email badge when they arrive a moment later). The
+   reduced-motion rule above turns the fade off. */
+.settings-dialog { height: min(86vh, 820px); }
+@keyframes settings-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.settings-fade-in { animation: settings-fade-in 0.18s ease-out both; }

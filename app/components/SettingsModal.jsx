@@ -90,11 +90,13 @@ export default function SettingsModal({ children }) {
           aria-modal="true"
           aria-labelledby="settings-title"
           tabIndex={-1}
-          className="modal-in relative flex max-h-full w-full max-w-[640px] flex-col"
+          className="settings-dialog modal-in relative flex max-h-full w-full max-w-[640px] flex-col"
           style={{ outline: "none" }}
         >
+          {/* Fixed height from the first frame (see .settings-dialog in globals.css), so the
+              pop-up doesn't change size when the settings arrive; the body scrolls inside. */}
           <div
-            className="modal-glow flex max-h-full min-h-0 flex-col overflow-hidden rounded-[26px] bg-[var(--bg)]"
+            className="modal-glow flex h-full min-h-0 flex-col overflow-hidden rounded-[26px] bg-[var(--bg)]"
             style={{ "--c": "var(--brand)", "--ring-tint": "var(--brand-ring)", color: INK }}
           >
             <div className="flex h-2 shrink-0" aria-hidden="true">
@@ -138,17 +140,62 @@ export function OpenFullSetup() {
   return <SettingsSkeleton />;
 }
 
-// Shown inside the pop-up for the moment it takes to read your settings (and ask Canvas who
-// you are), instead of a full loading screen.
+// Shown inside the pop-up for the moment it takes to read your settings: placeholder cards in
+// the same places as the real sections (Canvas, calendars, email), filling the same fixed-size
+// box, so the settings fade in over them without anything moving.
 export function SettingsSkeleton() {
   return (
     <>
       <SettingsModalHeader />
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden px-4 pb-6 pt-2 sm:px-6" role="status" aria-label="Loading settings">
-        {[104, 64, 64, 64].map((height, i) => (
-          <div key={i} className="settings-skeleton rounded-2xl" style={{ height, background: "var(--surface)" }} />
-        ))}
+        <div className="mt-2 flex flex-col gap-4" aria-hidden="true">
+          <SkeletonCard title={72} note={64}>
+            <Bone className="h-14 rounded-xl" tone="var(--surface-2)" />
+            <SkeletonField />
+            <SkeletonField />
+          </SkeletonCard>
+          <SkeletonCard title={180} note={64} chevron>
+            <Bone className="h-3.5 w-11/12 rounded" />
+            <Bone className="h-3.5 w-3/4 rounded" />
+            <Bone className="h-12 rounded-xl" tone="var(--surface-2)" />
+          </SkeletonCard>
+          <SkeletonCard title={210} note={64} chevron />
+          <SkeletonCard title={130} note={64} chevron>
+            <Bone className="h-10 w-64 max-w-full rounded-xl" tone="var(--surface-2)" />
+            <SkeletonField />
+          </SkeletonCard>
+        </div>
       </div>
     </>
+  );
+}
+
+function Bone({ className = "", tone = "var(--field)", style }) {
+  return <span className={`settings-skeleton block ${className}`} style={{ background: tone, ...style }} />;
+}
+
+// One settings section: a title line (with the small "Required"/"Optional" label), and for
+// sections that start open, some rows under it. Folded ones show only the chevron.
+function SkeletonCard({ title, note, chevron = false, children }) {
+  return (
+    <div className="rounded-2xl p-5" style={{ background: "var(--surface)" }}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Bone className="h-5 rounded-md" style={{ width: title }} />
+          <Bone className="h-3 rounded" style={{ width: note }} />
+        </div>
+        {chevron && <Bone className="h-4 w-4 rounded-full" />}
+      </div>
+      {children && <div className="mt-4 flex flex-col gap-3">{children}</div>}
+    </div>
+  );
+}
+
+function SkeletonField() {
+  return (
+    <div className="flex flex-col gap-2">
+      <Bone className="h-3.5 w-44 rounded" />
+      <Bone className="h-10 rounded-lg" />
+    </div>
   );
 }

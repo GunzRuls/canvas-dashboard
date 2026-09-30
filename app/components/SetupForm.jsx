@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Input, CanvasAddressHelp, TokenHelp, GmailHelp, ResendHelp } from "./setupHelp";
 import { LinkedCalendars, CanvasFeed } from "./CalendarSettings";
@@ -165,22 +165,9 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
       <form onSubmit={submit} className={`${modal ? "mt-2" : "mt-6"} flex flex-col gap-4`}>
         <Section title="Canvas" note="Required">
           {account && (
-            <div className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ background: "var(--surface-2)" }}>
-              <Avatar account={account} size={36} />
-              <div className="min-w-0 text-sm">
-                <p className="text-xs font-bold" style={{ color: MUTED }}>
-                  Connected as
-                </p>
-                <p className="truncate font-extrabold" style={{ color: INK }}>
-                  {account.name}
-                  {account.login && (
-                    <span className="font-semibold" style={{ color: "var(--ink-soft)" }}>
-                      {" "}· {account.login}
-                    </span>
-                  )}
-                </p>
-              </div>
-            </div>
+            <Suspense fallback={<ConnectedAsPlaceholder />}>
+              <ConnectedAs account={account} />
+            </Suspense>
           )}
           <Field
             label="Your school's Canvas address"
@@ -233,8 +220,13 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
           title="Morning email"
           note="Optional"
           open={emailOn}
-          status={emailOn && !emailOff && nextEmail ? `On · next one ${nextEmailLabel(nextEmail)}` : ""}
-          warning={emailOn && !emailOff && !nextEmail ? "Not scheduled yet. Click Save to start daily emails." : ""}
+          badge={
+            emailOn && !emailOff ? (
+              <Suspense fallback={<span className="settings-skeleton inline-block h-5 w-28 rounded-full" style={{ background: "var(--surface-2)" }} aria-hidden="true" />}>
+                <EmailSchedule nextEmail={nextEmail} />
+              </Suspense>
+            ) : null
+          }
           onRemove={!emailOff ? turnOffEmail : null}
           removeLabel="Turn off morning email"
         >
@@ -399,6 +391,23 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
         </div>
       </form>
 
+      {!firstRun && (
+        <section className="settings-card mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl p-5" style={{ background: "var(--surface)" }}>
+          <div className="min-w-0">
+            <span className="font-display text-lg font-extrabold" style={{ color: INK }}>
+              First-time setup
+            </span>
+            <p className="mt-1 text-sm" style={{ color: MUTED }}>
+              See the setup steps a new student sees. Nothing you enter there is saved.
+            </p>
+          </div>
+          {/* A full page load on purpose: a client-side move to /setup would be caught by the
+              Settings pop-up route (app/@modal/(.)setup) instead of showing the walkthrough. */}
+          <a href="/setup?tour=1" className="btn btn-secondary px-4 py-2 text-sm">
+            Walk through setup
+          </a>
+        </section>
+      )}
       {!firstRun && <Maintenance installed={installed} version={version} />}
     </>
   );
@@ -408,7 +417,7 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
     return (
       <>
         <SettingsModalHeader />
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-2 sm:px-6">{content}</div>
+        <div className="settings-fade-in min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-2 sm:px-6">{content}</div>
       </>
     );
   }
@@ -511,7 +520,68 @@ function Maintenance({ installed, version }) {
   );
 }
 
-function Section({ title, note, open = true, status, warning, onRemove, removeLabel, children }) {
+// Settings get `account` and `nextEmail` as promises from the server (they're slow to look up),
+// so the rest of the form doesn't wait for them. A plain value works too.
+function useSettled(value) {
+  return value && typeof value.then === "function" ? use(value) : value;
+}
+
+// "Connected as" card at the top of the Canvas section.
+function ConnectedAs({ account: accountOrPromise }) {
+  const account = useSettled(accountOrPromise);
+  if (!account) return null;
+  return (
+    <div className="settings-fade-in flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ background: "var(--surface-2)" }}>
+      <Avatar account={account} size={36} />
+      <div className="min-w-0 text-sm">
+        <p className="text-xs font-bold" style={{ color: MUTED }}>
+          Connected as
+        </p>
+        <p className="truncate font-extrabold" style={{ color: INK }}>
+          {account.name}
+          {account.login && (
+            <span className="font-semibold" style={{ color: "var(--ink-soft)" }}>
+              {" "}· {account.login}
+            </span>
+          )}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// Same size as the card above, so nothing moves when your name arrives from Canvas.
+function ConnectedAsPlaceholder() {
+  return (
+    <div className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ background: "var(--surface-2)" }} aria-hidden="true">
+      <span className="settings-skeleton h-9 w-9 shrink-0 rounded-full" style={{ background: "var(--surface)" }} />
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5 py-0.5">
+        <span className="settings-skeleton h-3 w-20 rounded" style={{ background: "var(--surface)" }} />
+        <span className="settings-skeleton h-3.5 w-3/5 rounded" style={{ background: "var(--surface)" }} />
+      </div>
+    </div>
+  );
+}
+
+// Morning email badge: when the next one goes out, or a nudge to save if Windows has no task.
+function EmailSchedule({ nextEmail: nextOrPromise }) {
+  const nextEmail = useSettled(nextOrPromise);
+  return nextEmail ? (
+    <Badge tone="green">On · next one {nextEmailLabel(nextEmail)}</Badge>
+  ) : (
+    <Badge tone="amber">Not scheduled yet. Click Save to start daily emails.</Badge>
+  );
+}
+
+function Badge({ tone, children }) {
+  return (
+    <span className="rounded-full px-2 py-0.5 text-xs font-bold" style={{ background: `var(--${tone}-bg)`, color: `var(--${tone}-fg)` }}>
+      {children}
+    </span>
+  );
+}
+
+function Section({ title, note, open = true, status, warning, badge, onRemove, removeLabel, children }) {
   const body = <div className="mt-3 flex flex-col gap-3">{children}</div>;
   const heading = (
     <span className="flex flex-wrap items-baseline gap-2">
@@ -521,16 +591,9 @@ function Section({ title, note, open = true, status, warning, onRemove, removeLa
       <span className="text-xs font-bold uppercase tracking-wide" style={{ color: MUTED }}>
         {note}
       </span>
-      {status && (
-        <span className="rounded-full px-2 py-0.5 text-xs font-bold" style={{ background: "var(--green-bg)", color: "var(--green-fg)" }}>
-          {status}
-        </span>
-      )}
-      {warning && (
-        <span className="rounded-full px-2 py-0.5 text-xs font-bold" style={{ background: "var(--amber-bg)", color: "var(--amber-fg)" }}>
-          {warning}
-        </span>
-      )}
+      {status && <Badge tone="green">{status}</Badge>}
+      {warning && <Badge tone="amber">{warning}</Badge>}
+      {badge}
     </span>
   );
 
