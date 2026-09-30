@@ -20,7 +20,7 @@ function onDay(e, key) {
   return e.end > e.start ? key >= e.start && key < e.end : key === e.start;
 }
 
-export default function WeekStrip({ items, status, events, calendarEnabled, hiddenEvents = [], now, colorFor, nameFor }) {
+export default function WeekStrip({ items, status, events, calendarEnabled, now, colorFor, nameFor }) {
   if (!now) return <div className="h-[124px] flex-1" />;
 
   const days = Array.from({ length: 7 }, (_, i) => {
@@ -29,10 +29,6 @@ export default function WeekStrip({ items, status, events, calendarEnabled, hidd
     d.setDate(d.getDate() + i);
     return d;
   });
-
-  // Personal events kept off the strip (see lib/loadDashboard.js), counted for these 7 days.
-  const dayKeys = days.map(localKey);
-  const hiddenCount = hiddenEvents.filter((e) => dayKeys.some((key) => onDay(e, key))).length;
 
   return (
     <div className="flex flex-1 flex-col">
@@ -131,14 +127,7 @@ export default function WeekStrip({ items, status, events, calendarEnabled, hidd
           </Link>{" "}
           to see class events here.
         </p>
-      ) : hiddenCount > 0 ? (
-        <p className="mt-1 text-xs" style={{ color: MUTED }}>
-          {hiddenCount} personal event{hiddenCount === 1 ? "" : "s"} hidden.{" "}
-          <Link href="/setup" scroll={false} className="text-link font-bold underline">
-            Show them
-          </Link>
-        </p>
-      ) : null}
+      ) : null /* no "N personal events hidden" line: the user found it noisy (DASH-7); Settings still lets a calendar show everything */}
     </div>
   );
 }

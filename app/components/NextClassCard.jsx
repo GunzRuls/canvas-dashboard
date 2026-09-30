@@ -60,41 +60,28 @@ const contrast = (a, b) => {
 };
 const SOFT = 0.85; // secondary text is the text color at 85%
 
+// One solid, darker version of the class color with white text, the same style for every class
+// (the user asked for no gradient and no separate look for bright colors). Light colors like
+// sun and lime simply get darkened more, until the dimmer secondary text still reads at 4.5:1.
 function heroColors(color) {
   if (!/^#[0-9a-f]{6}$/i.test(color || "")) color = "#3355FF";
   const c = rgb(color);
-  // Most color we can keep with white text still readable (the lighter, top-left end is the worst case).
   const softOn = (bg) => contrast(mix(WHITE, bg, SOFT), bg);
-  let p = 0.82;
-  while (p > 0.62 && softOn(mix(c, DEEP, p)) < 4.5) p -= 0.02;
-  if (softOn(mix(c, DEEP, p)) >= 4.5) {
-    const bot = mix(c, DEEP, p - 0.2);
-    return {
-      "--hero-top": css(mix(c, DEEP, p)),
-      "--hero-bot": css(bot),
-      "--hero-fg": "#FFFFFF",
-      "--hero-soft": css(WHITE, SOFT),
-      "--hero-glass": css(DEEP, 0.22), // darker, so white text on it gets more contrast, not less
-      "--hero-hover": css(DEEP, 0.16),
-      "--hero-track": css(WHITE, 0.25),
-      "--hero-btn-bg": "#FFFFFF",
-      "--hero-btn-fg": css(bot),
-      "--hero-btn-hover": css(mix(WHITE, c, 0.88)),
-      "--hero-btn-edge": css(DEEP, 0.35),
-    };
-  }
+  let p = 0.72; // share of the class color kept; the rest is ink
+  while (p > 0.2 && softOn(mix(c, DEEP, p)) < 4.5) p -= 0.02;
+  const fill = mix(c, DEEP, p);
   return {
-    "--hero-top": css(mix(c, WHITE, 0.86)),
-    "--hero-bot": css(c),
-    "--hero-fg": css(DEEP),
-    "--hero-soft": css(DEEP, 0.8),
-    "--hero-glass": css(WHITE, 0.4), // lighter, so ink text on it gets more contrast
-    "--hero-hover": css(WHITE, 0.3),
-    "--hero-track": css(DEEP, 0.15),
-    "--hero-btn-bg": css(DEEP),
-    "--hero-btn-fg": css(c),
-    "--hero-btn-hover": css(mix(DEEP, WHITE, 0.88)),
-    "--hero-btn-edge": css([0, 0, 0], 0.35),
+    "--hero-top": css(fill), // top and bottom are the same color: a solid fill
+    "--hero-bot": css(fill),
+    "--hero-fg": "#FFFFFF",
+    "--hero-soft": css(WHITE, SOFT),
+    "--hero-glass": css(DEEP, 0.22), // darker, so white text on it gets more contrast, not less
+    "--hero-hover": css(DEEP, 0.16),
+    "--hero-track": css(WHITE, 0.25),
+    "--hero-btn-bg": "#FFFFFF",
+    "--hero-btn-fg": css(fill),
+    "--hero-btn-hover": css(mix(WHITE, c, 0.88)),
+    "--hero-btn-edge": css(DEEP, 0.35),
   };
 }
 
