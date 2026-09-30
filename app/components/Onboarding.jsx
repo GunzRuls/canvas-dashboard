@@ -4,15 +4,16 @@ import { useEffect, useRef, useState } from "react";
 import { Input, CanvasAddressHelp, TokenHelp, GmailHelp, ResendHelp } from "./setupHelp";
 import { CalendarLinkField } from "./CalendarSettings";
 import { ClassTimesRow, EMPTY_TIMES, isBlank, timesProblem } from "./ClassTimes";
-import { tourResponse } from "@/lib/tour";
+import { tourResponse, onboardingStart, sampleClassRows, isSampleValue, TOUR_SAMPLE } from "@/lib/tour";
 
 // First launch: a step-by-step setup instead of one long form. Canvas is required; class times
 // (listed right after Canvas connects), the calendar and email can be skipped. Each save goes through /api/config, which checks
 // Canvas (and calendar links) before anything is stored. Later changes happen in Settings.
 //
-// Walkthrough (`tour` = { name, classes } of the connected account, from /setup?tour=1): the same
-// screens, but every write goes through `send` below, which answers locally (lib/tour.js) instead
-// of calling the server, and the theme is only previewed. Nothing is saved.
+// Walkthrough (`tour` set, from /setup?tour=1): the same screens, every field already filled with
+// obviously fake sample data (TOUR_SAMPLE in lib/tour.js), so you can click straight through. Every
+// write goes through `send` below, which answers locally instead of calling the server, the class
+// list is the sample one (no Canvas call), and the theme is only previewed. Nothing is saved.
 
 const INK = "var(--ink)";
 const MUTED = "var(--muted)";
@@ -22,9 +23,13 @@ const STEPS = ["welcome", "school", "connect", "calendar", "email", "look", "don
 function sender(tour) {
   if (tour) {
     // A short pause so buttons show "Checking…" like the real thing.
-    return (url, body) => new Promise((resolve) => setTimeout(() => resolve(tourResponse(url, body, tour)), 400));
+    return (url, body) => new Promise((resolve) => setTimeout(() => resolve(tourResponse(url, body)), 400));
   }
   return async (url, body) => {
+    // Belt and braces: a sample value from the walkthrough must never reach Canvas or Google.
+    if (Object.values(body || {}).some(isSampleValue)) {
+      return { ok: false, error: "That's a sample value from the walkthrough. Paste your own." };
+    }
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -36,21 +41,22 @@ function sender(tour) {
 
 export default function Onboarding({ tour = null }) {
   const send = sender(tour);
+  const [start] = useState(() => onboardingStart(tour)); // sample values in a walkthrough, else empty
   const [step, setStep] = useState(0);
-  const [canvasBaseUrl, setCanvasBaseUrl] = useState("");
-  const [canvasToken, setCanvasToken] = useState("");
+  const [canvasBaseUrl, setCanvasBaseUrl] = useState(start.canvasBaseUrl);
+  const [canvasToken, setCanvasToken] = useState(start.canvasToken);
   const [connected, setConnected] = useState(null); // { name, classes } once Canvas accepts the token
   const [classTimes, setClassTimes] = useState(null); // how many classes got times, once saved
-  const [calendarUrls, setCalendarUrls] = useState("");
+  const [calendarUrls, setCalendarUrls] = useState(start.calendarUrls);
   const [calendarSource, setCalendarSource] = useState("google");
   const [calendarSaved, setCalendarSaved] = useState(false);
   const [emailProvider, setEmailProvider] = useState("gmail");
-  const [gmailAddress, setGmailAddress] = useState("");
-  const [gmailAppPassword, setGmailAppPassword] = useState("");
-  const [resendApiKey, setResendApiKey] = useState("");
-  const [digestToEmail, setDigestToEmail] = useState("");
-  const [sendTime, setSendTime] = useState("07:00");
-  const [sendDays, setSendDays] = useState("weekdays");
+  const [gmailAddress, setGmailAddress] = useState(start.gmailAddress);
+  const [gmailAppPassword, setGmailAppPassword] = useState(start.gmailAppPassword);
+  const [resendApiKey, setResendApiKey] = useState(start.resendApiKey);
+  const [digestToEmail, setDigestToEmail] = useState(start.digestToEmail);
+  const [sendTime, setSendTime] = useState(start.sendTime);
+  const [sendDays, setSendDays] = useState(start.sendDays);
   const [emailSaved, setEmailSaved] = useState(false);
   const [theme, setTheme] = useState("system");
   const [busy, setBusy] = useState(false);
@@ -87,7 +93,7 @@ export default function Onboarding({ tour = null }) {
     const data = await save({ canvasToken });
     if (data) {
       setConnected({ name: data.name, classes: data.classes });
-      setCanvasToken("");
+      if (!tour) setCanvasToken(""); // the walkthrough keeps its sample so Connect works again after Back
     }
   }
 
@@ -106,6 +112,15 @@ export default function Onboarding({ tour = null }) {
       if (emailProvider === "gmail" && !digestToEmail) setDigestToEmail(gmailAddress);
       setEmailSaved(true);
       next();
+    }
+  }
+
+  // In a walkthrough, switching Google/Outlook swaps in that service's sample link (unless you
+  // typed your own).
+  function chooseCalendarSource(value) {
+    setCalendarSource(value);
+    if (tour && (!calendarUrls || Object.values(TOUR_SAMPLE.calendar).includes(calendarUrls))) {
+      setCalendarUrls(TOUR_SAMPLE.calendar[value]);
     }
   }
 
@@ -193,6 +208,7 @@ export default function Onboarding({ tour = null }) {
                   className="mt-4 !py-2.5 !text-base"
                   aria-label="Canvas address"
                 />
+                {tour && canvasBaseUrl === TOUR_SAMPLE.canvasBaseUrl && <SampleTag>A made-up school address.</SampleTag>}
                 <div className="mt-3">
                   <CanvasAddressHelp inline />
                 </div>
@@ -222,6 +238,9 @@ export default function Onboarding({ tour = null }) {
                   className="mt-4 !py-2.5 !text-base"
                   aria-label="Canvas access token"
                 />
+                {tour && canvasToken === TOUR_SAMPLE.canvasToken && (
+                  <SampleTag>A fake token. Connect answers right here, without asking Canvas.</SampleTag>
+                )}
                 <ErrorNote text={error} />
                 <Actions>
                   <Secondary onClick={back}>Back</Secondary>
@@ -259,11 +278,16 @@ export default function Onboarding({ tour = null }) {
                 <div className="mt-4">
                   <CalendarLinkField
                     source={calendarSource}
-                    setSource={setCalendarSource}
+                    setSource={chooseCalendarSource}
                     url={calendarUrls}
                     setUrl={setCalendarUrls}
                     required
                   />
+                  {tour && calendarUrls === TOUR_SAMPLE.calendar[calendarSource] && (
+                    <SampleTag>
+                      A fake {calendarSource === "google" ? "Google" : "Outlook"} link. Nothing is checked or added.
+                    </SampleTag>
+                  )}
                 </div>
                 <ErrorNote text={error} />
                 <Actions>
@@ -316,6 +340,9 @@ export default function Onboarding({ tour = null }) {
                       <Input type="password" value={resendApiKey} onChange={setResendApiKey} placeholder="Resend API key (re_…)" required aria-label="Resend API key" />
                       <Input type="email" value={digestToEmail} onChange={setDigestToEmail} placeholder="Send to: the email you signed up with" required aria-label="Send to" />
                     </>
+                  )}
+                  {tour && (
+                    <EmailSampleTag provider={emailProvider} values={{ gmailAddress, gmailAppPassword, resendApiKey, digestToEmail }} />
                   )}
                   <div className="flex flex-wrap items-center gap-2">
                     <label className="text-sm font-bold" style={{ color: INK }} htmlFor="ob-time">
@@ -396,7 +423,11 @@ export default function Onboarding({ tour = null }) {
               </p>
               <Title>You&apos;re all set</Title>
               <ul className="mt-4 space-y-1.5 text-sm" style={{ color: "var(--ink-soft)" }}>
-                <li>✓ Canvas connected{connected?.classes != null ? ` (${connected.classes} classes)` : ""}</li>
+                <li>
+                  ✓ Canvas connected
+                  {tour && connected?.name ? ` as ${connected.name} at ${canvasBaseUrl.replace(/^https?:\/\//, "")}` : ""}
+                  {connected?.classes != null ? ` (${connected.classes} classes)` : ""}
+                </li>
                 <li style={{ color: classTimes ? undefined : MUTED }}>
                   {classTimes
                     ? `✓ Class times for ${classTimes} ${classTimes === 1 ? "class" : "classes"}`
@@ -404,14 +435,17 @@ export default function Onboarding({ tour = null }) {
                 </li>
                 <li style={{ color: calendarSaved ? undefined : MUTED }}>
                   {calendarSaved ? "✓ Calendar added" : "– Calendar skipped"}
+                  {tour && calendarSaved ? ` (${calendarSource === "google" ? "Google" : "Outlook"})` : ""}
                 </li>
                 <li style={{ color: emailSaved ? undefined : MUTED }}>
                   {emailSaved ? `✓ Morning email to ${digestToEmail}` : "– Morning email skipped"}
+                  {tour && emailSaved ? `, ${timeLabel(sendTime)} on ${sendDays === "daily" ? "every day" : "weekdays"}` : ""}
                 </li>
               </ul>
               {tour && (
                 <p className="mt-4 rounded-xl px-4 py-3 text-sm font-bold" style={{ background: "var(--brand-tint)", color: "var(--brand-text)" }}>
-                  That was the walkthrough. Nothing was saved, and your real settings are unchanged.
+                  That was the walkthrough, with sample data. Nothing was saved or sent, and your real settings are
+                  unchanged.
                 </p>
               )}
               <p className="mt-4 text-sm" style={{ color: MUTED }}>
@@ -474,7 +508,9 @@ async function fetchClasses() {
 // they're entered once per semester. Saving sends only class times and hidden classes; names and
 // colors are kept.
 function ClassesList({ tour, send, connected, back, skip, onSaved }) {
-  const [rows, setRows] = useState(null); // [{ id, name, code, color, hidden, times }]
+  // A walkthrough starts with the sample classes (filled, empty and switched-off rows) and never
+  // asks Canvas; otherwise the list loads from /api/settings.
+  const [rows, setRows] = useState(() => (tour ? sampleClassRows() : null)); // [{ id, name, code, color, hidden, times }]
   const [before, setBefore] = useState({ schedule: {}, hidden: [] }); // what's already saved
   const [loadError, setLoadError] = useState("");
   const [error, setError] = useState("");
@@ -485,23 +521,18 @@ function ClassesList({ tour, send, connected, back, skip, onSaved }) {
   const load = () =>
     fetchClasses().then(
       (data) => {
-        if (tour) {
-          // Show it the way a new user sees it: Canvas's names, nothing hidden, no times yet.
-          setRows(data.courses.map((c) => ({ ...c, name: c.defaultName || c.name, hidden: false, times: EMPTY_TIMES })));
-        } else {
-          setBefore({ schedule: data.settings.schedule || {}, hidden: data.settings.hidden || [] });
-          setRows(data.courses.map((c) => ({ ...c, times: c.schedule || EMPTY_TIMES })));
-        }
+        setBefore({ schedule: data.settings.schedule || {}, hidden: data.settings.hidden || [] });
+        setRows(data.courses.map((c) => ({ ...c, times: c.schedule || EMPTY_TIMES })));
         setLoadError("");
       },
       (err) => setLoadError(err.message)
     );
 
   useEffect(() => {
-    load();
+    if (!tour) load();
     // The token field and Connect button just went away, so keep keyboard focus on this card.
     headingRef.current?.focus();
-  }, []);
+  }, [tour]); // `tour` never changes while this is shown, so this runs once
 
   const update = (id, changes) => setRows((r) => r.map((row) => (row.id === id ? { ...row, ...changes } : row)));
   const classes = (rows || []).filter((r) => !r.hidden);
@@ -602,6 +633,9 @@ function ClassesList({ tour, send, connected, back, skip, onSaved }) {
           </>
         )}
 
+        {tour && (
+          <SampleTag>Sample classes: some filled in, one empty, one switched off. Edit anything to try it.</SampleTag>
+        )}
         {rows && rows.length > 0 && (
           <p className="mt-4 text-xs" style={{ color: MUTED }}>
             Switch off anything that isn&apos;t a class (like Career Services). It won&apos;t show on your dashboard.
@@ -706,7 +740,7 @@ function TourBanner() {
       style={{ background: "var(--brand-tint)", color: "var(--brand-text)" }}
     >
       <span>
-        <b>Walkthrough:</b> nothing you enter here is saved. Your real settings stay as they are.
+        <b>Walkthrough:</b> everything here is sample data, so just click through. Nothing is saved or sent.
       </span>
       {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- full load on purpose (see above) */}
       <a href="/" className="font-extrabold underline underline-offset-2 hover:no-underline">
@@ -714,6 +748,39 @@ function TourBanner() {
       </a>
     </div>
   );
+}
+
+// A small "Sample" label under a field the walkthrough filled in. It goes away once you type your own.
+function SampleTag({ children }) {
+  return (
+    <p className="mt-2 flex items-start gap-2 text-xs" style={{ color: MUTED }}>
+      <span
+        className="flex-none rounded-md px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide"
+        style={{ background: "var(--brand-tint)", color: "var(--brand-text)" }}
+      >
+        Sample
+      </span>
+      <span className="pt-px">{children}</span>
+    </p>
+  );
+}
+
+function EmailSampleTag({ provider, values }) {
+  const sample = TOUR_SAMPLE.email;
+  const fields = provider === "gmail" ? ["gmailAddress", "gmailAppPassword"] : ["resendApiKey", "digestToEmail"];
+  if (!fields.every((f) => values[f] === sample[f])) return null;
+  return (
+    <SampleTag>
+      {provider === "gmail" ? "A made-up Gmail address and app password." : "A fake Resend key."} No email is sent.
+    </SampleTag>
+  );
+}
+
+// "07:00" → "7:00 AM".
+function timeLabel(value) {
+  const [h, m] = String(value || "").split(":").map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return value;
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 }
 
 function Card({ children }) {
