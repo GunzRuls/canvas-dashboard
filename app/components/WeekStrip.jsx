@@ -14,7 +14,7 @@ function clock(iso) {
 }
 
 export default function WeekStrip({ items, status, events, calendarEnabled, now, colorFor, nameFor }) {
-  if (!now) return <div className="h-[132px]" />;
+  if (!now) return <div className="h-[124px]" />;
 
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(now);
@@ -26,7 +26,7 @@ export default function WeekStrip({ items, status, events, calendarEnabled, now,
   return (
     <div>
       <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-        <div className="grid min-w-[900px] grid-cols-7 gap-2">
+        <div className="panel grid min-w-[900px] grid-cols-7 overflow-hidden">
           {days.map((day, i) => {
             const key = localKey(day);
             const due = items
@@ -41,42 +41,51 @@ export default function WeekStrip({ items, status, events, calendarEnabled, now,
             );
             const heavy = due.length >= HEAVY_DAY;
             const label =
-              i === 0 ? "Today" : i === 1 ? "Tomorrow" : day.toLocaleDateString(undefined, { weekday: "long" });
+              i === 0 ? "Today" : i === 1 ? "Tomorrow" : day.toLocaleDateString(undefined, { weekday: "short" });
 
             return (
               <div
                 key={key}
-                className="flex h-[132px] flex-col rounded-xl p-2"
+                className="flex h-[124px] flex-col px-2.5 py-2"
                 style={{
-                  background: heavy ? "var(--red-bg)" : i === 0 ? "var(--surface)" : "var(--surface-2)",
-                  boxShadow: i === 0 ? `inset 0 0 0 2px ${INK}` : "none",
+                  borderLeft: i === 0 ? "none" : "1px solid var(--line)",
+                  background: heavy ? "var(--red-bg)" : "transparent",
                 }}
               >
-                <div className="mb-1.5 flex flex-none items-baseline justify-between px-0.5">
-                  <span className="text-sm font-bold" style={{ color: INK }}>
-                    {label}
-                  </span>
-                  <span className="text-sm font-semibold" style={{ color: MUTED }}>
+                <div className="mb-1.5 flex flex-none items-center justify-between gap-1">
+                  {i === 0 ? (
+                    <span className="rounded-full bg-[var(--brand)] px-2 py-0.5 text-xs font-extrabold text-white">
+                      {label}
+                    </span>
+                  ) : (
+                    <span className="text-sm font-bold" style={{ color: INK }}>
+                      {label}
+                    </span>
+                  )}
+                  <span className="text-xs font-semibold" style={{ color: MUTED }}>
                     {day.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
                   </span>
                 </div>
                 {heavy && (
-                  <p className="mb-1 flex-none px-0.5 text-[11px] font-bold" style={{ color: "var(--red-fg)" }}>
+                  <p className="mb-1 flex-none text-[11px] font-bold" style={{ color: "var(--red-fg)" }}>
                     Heavy day: {due.length} due
                   </p>
                 )}
-                <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
+                <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
                   {dayEvents.map((e) => (
                     <div
                       key={e.id}
-                      className="flex-none truncate rounded-md px-1.5 py-1 text-[11px]"
-                      style={{ background: "var(--inverse)", color: "var(--inverse-fg)" }}
+                      className="flex flex-none items-center gap-1.5 truncate text-[11px] leading-tight"
+                      style={{ color: "var(--ink-soft)" }}
                       title={`${e.title}, ${e.allDay ? "all day" : `${clock(e.start)} to ${clock(e.end)}`}`}
                     >
-                      <span className="font-semibold opacity-75">
-                        {e.allDay ? "All day" : `${clock(e.start)}–${clock(e.end)}`}
-                      </span>{" "}
-                      <span className="font-bold">{e.title}</span>
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--ink-soft)]" aria-hidden="true" />
+                      <span className="truncate">
+                        <span className="font-semibold" style={{ color: MUTED }}>
+                          {e.allDay ? "All day" : clock(e.start)}
+                        </span>{" "}
+                        <span className="font-bold">{e.title}</span>
+                      </span>
                     </div>
                   ))}
                   {due.map((it) => {
@@ -87,21 +96,19 @@ export default function WeekStrip({ items, status, events, calendarEnabled, now,
                         href={it.url || undefined}
                         target="_blank"
                         rel="noreferrer"
-                        className="block flex-none rounded-md px-1.5 py-1 text-[11px] leading-tight hover:brightness-95"
-                        style={{ background: `${color}1F`, borderLeft: `3px solid ${color}` }}
+                        className="row-hover flex flex-none items-center gap-1.5 rounded-md px-1 py-0.5 text-[11px] leading-tight"
+                        style={{ "--c": color }}
                         title={`${nameFor(it.courseId, it.courseName)}: ${it.title}, ${clock(it.dueAt)}`}
                       >
-                        <span className="block truncate font-bold" style={{ color: INK }}>
+                        <span className="c-dot h-2 w-2 shrink-0 rounded-full" aria-hidden="true" />
+                        <span className="truncate font-bold" style={{ color: INK }}>
                           {it.title}
-                        </span>
-                        <span className="block truncate font-semibold" style={{ color }}>
-                          {clock(it.dueAt)}, {nameFor(it.courseId, it.courseName)}
                         </span>
                       </a>
                     );
                   })}
                   {!due.length && !dayEvents.length && (
-                    <p className="px-0.5 text-xs" style={{ color: MUTED }}>
+                    <p className="text-xs" style={{ color: MUTED }}>
                       Open day
                     </p>
                   )}

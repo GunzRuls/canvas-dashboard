@@ -453,22 +453,18 @@ export default function Dashboard({
           <SmartCheckIn checkIn={checkIn} />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Stat value={dueThisWeek} label="due this week" bg="var(--blue-bg)" fg="var(--blue-fg)" />
-          <Stat
-            value={overdue}
-            label="overdue"
-            bg={overdue ? "var(--red-bg)" : "var(--surface-2)"}
-            fg={overdue ? "var(--red-fg)" : MUTED}
-          />
-          <Stat value={unreadCount} label="unread" bg="var(--purple-bg)" fg="var(--purple-fg)" />
-          {liveGrades.length > 0 && (
-            <Stat
-              value={liveGrades.length}
-              label={liveGrades.length === 1 ? "new grade" : "new grades"}
-              bg="var(--green-bg)"
-              fg="var(--green-fg)"
-            />
-          )}
+          <div className="panel flex h-10 flex-wrap items-center gap-1 rounded-full px-3">
+            <Stat value={dueThisWeek} label="due this week" color="var(--blue-fg)" />
+            <Stat value={overdue} label="overdue" color={overdue ? "var(--red-fg)" : "var(--line-2)"} />
+            <Stat value={unreadCount} label="unread" color="var(--purple-fg)" />
+            {liveGrades.length > 0 && (
+              <Stat
+                value={liveGrades.length}
+                label={liveGrades.length === 1 ? "new grade" : "new grades"}
+                color="var(--green-fg)"
+              />
+            )}
+          </div>
           <span className="mx-1 hidden h-6 w-px bg-[var(--line)] sm:block" />
           <TopButton onClick={toggleTheme} label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
             {theme === "dark" ? "Light mode" : "Dark mode"}
@@ -505,39 +501,39 @@ export default function Dashboard({
         />
       </section>
 
-      {/* Grades | Board | Announcements */}
-      <div className="grid grid-cols-1 gap-4 xl:min-h-[520px] xl:flex-1 xl:grid-cols-[250px_minmax(0,1fr)_320px] xl:grid-rows-1">
-        {/* Grades */}
-        <section className="flex min-h-0 flex-col" aria-labelledby="grades-heading">
-          <PanelHeading id="grades-heading" title="Grades">
-            {filter ? (
-              <button onClick={() => setFilter(null)} className="text-xs font-bold underline" style={{ color: INK }}>
-                Show all
-              </button>
-            ) : (
-              <span className="text-xs" style={{ color: MUTED }}>Tap one to focus</span>
-            )}
-          </PanelHeading>
-          {courses.length === 0 ? (
-            <Empty text="No classes to show. Use Manage classes to unhide one." />
+      {/* Grades: one row of rings */}
+      <section className="flex-none" aria-labelledby="grades-heading">
+        <PanelHeading id="grades-heading" title="Grades">
+          {filter ? (
+            <button onClick={() => setFilter(null)} className="text-xs font-bold underline" style={{ color: INK }}>
+              Show all classes
+            </button>
           ) : (
-            <div className="grid min-h-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:flex xl:flex-col xl:overflow-y-auto xl:pr-1">
-              {courses.map((c) => (
-                <GradeTile
-                  key={c.id}
-                  course={c}
-                  active={filter === c.id}
-                  dimmed={Boolean(filter) && filter !== c.id}
-                  onSelect={() => setFilter(filter === c.id ? null : c.id)}
-                  onWhatIf={() => setWhatIfCourse(c)}
-                  newGrades={gradesByCourse[c.id] || []}
-                  onSeen={(list) => markGradesSeen(list)}
-                />
-              ))}
-            </div>
+            <span className="text-xs" style={{ color: MUTED }}>Click a class to focus on it</span>
           )}
-        </section>
+        </PanelHeading>
+        {courses.length === 0 ? (
+          <Empty text="No classes to show. Use Manage classes to unhide one." />
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[repeat(auto-fit,minmax(210px,1fr))]">
+            {courses.map((c) => (
+              <GradeRing
+                key={c.id}
+                course={c}
+                active={filter === c.id}
+                dimmed={Boolean(filter) && filter !== c.id}
+                onSelect={() => setFilter(filter === c.id ? null : c.id)}
+                onWhatIf={() => setWhatIfCourse(c)}
+                newGrades={gradesByCourse[c.id] || []}
+                onSeen={(list) => markGradesSeen(list)}
+              />
+            ))}
+          </div>
+        )}
+      </section>
 
+      {/* Board | Announcements */}
+      <div className="grid grid-cols-1 gap-5 xl:min-h-[420px] xl:flex-1 xl:grid-cols-[minmax(0,1fr)_380px] xl:grid-rows-1">
         {/* Board */}
         <section className="flex min-h-0 flex-col" aria-labelledby="board-heading">
           <PanelHeading id="board-heading" title={filteredCourse ? `Assignments: ${filteredCourse.name}` : "Assignments"}>
@@ -647,6 +643,7 @@ export default function Dashboard({
               <CardList
                 cards={visibleAnnouncements}
                 collapseAfter={12}
+                listClassName="panel flex flex-col divide-y divide-[var(--line)] overflow-hidden"
                 renderCard={(a) => (
                   <AnnouncementCard
                     key={a.id}
@@ -745,10 +742,14 @@ function TopButton({ children, onClick, disabled, strong, label }) {
   );
 }
 
-function Stat({ value, label, bg, fg }) {
+function Stat({ value, label, color }) {
   return (
-    <span className="rounded-full px-3 py-1.5 text-sm font-semibold" style={{ background: bg, color: fg }}>
-      <span className="font-extrabold">{value ?? "–"}</span> {label}
+    <span className="flex items-center gap-1.5 px-1.5 text-sm font-semibold" style={{ color: "var(--ink-soft)" }}>
+      <span className="h-2 w-2 rounded-full" style={{ background: color }} aria-hidden="true" />
+      <span className="font-extrabold" style={{ color: INK }}>
+        {value ?? "–"}
+      </span>
+      {label}
     </span>
   );
 }
@@ -762,91 +763,70 @@ function formatNumber(n) {
   return Number.isInteger(Number(n)) ? String(n) : Number(n).toFixed(1);
 }
 
-function GradeTile({ course, active, dimmed, onSelect, onWhatIf, newGrades, onSeen }) {
+function GradeRing({ course, active, dimmed, onSelect, onWhatIf, newGrades, onSeen }) {
+  const [open, setOpen] = useState(false);
   const score = course.score;
   const hasNew = newGrades.length > 0;
+  const pct = score === null ? 0 : Math.max(0, Math.min(100, Number(score)));
   return (
     <div
-      className="relative flex-none rounded-xl p-3 text-white transition-opacity"
+      className="grade-item panel relative flex flex-col gap-2 p-3 transition-opacity"
       style={{
-        background: course.color,
-        opacity: dimmed ? 0.4 : 1,
-        boxShadow: active
-          ? `0 0 0 2px var(--bg), 0 0 0 4px ${course.color}`
-          : hasNew
-          ? `0 0 0 2px var(--bg), 0 0 0 4px var(--green-fg)`
-          : "none",
+        "--c": course.color,
+        opacity: dimmed ? 0.45 : 1,
+        zIndex: open ? 30 : undefined,
+        boxShadow: active ? `0 0 0 2px var(--bg), 0 0 0 4px ${course.color}` : undefined,
       }}
     >
-      {/* Clicking the tile (anywhere that isn't a link or button) focuses the board on this class. */}
+      {/* Clicking the card (anywhere that isn't a link or button) focuses the page on this class. */}
       <button
         onClick={onSelect}
         aria-pressed={active}
         aria-label={`Show only ${course.name}`}
-        className="absolute inset-0 rounded-xl"
+        className="absolute inset-0 rounded-[1.25rem]"
       />
-      <div className="pointer-events-none relative flex items-start justify-between gap-2">
-        <a
-          href={course.homeUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="pointer-events-auto line-clamp-2 text-sm font-bold leading-snug hover:underline"
-          title={`Open ${course.name} in Canvas`}
+      <div className="pointer-events-none relative flex items-center gap-3">
+        <div
+          className="grade-ring relative grid h-14 w-14 shrink-0 place-items-center rounded-full"
+          style={{
+            background: `conic-gradient(var(--c) ${pct * 3.6}deg, color-mix(in srgb, var(--c) 16%, var(--surface-2)) 0)`,
+          }}
+          aria-hidden="true"
         >
-          {course.name}
-          <svg aria-hidden="true" viewBox="0 0 12 12" className="ml-1 inline-block h-2.5 w-2.5 opacity-75">
-            <path d="M3.5 2.5h6v6M9.5 2.5 2.5 9.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-          </svg>
-        </a>
-        {score === null ? (
-          <span className="shrink-0 whitespace-nowrap text-sm font-bold opacity-90">No grade</span>
-        ) : (
-          <span className="font-display shrink-0 text-xl font-extrabold leading-none tracking-tight">
-            {Number(score).toFixed(1)}%
-            {course.grade && <span className="ml-1 text-xs font-bold opacity-90">{course.grade}</span>}
-          </span>
-        )}
+          <div className="grid h-11 w-11 place-items-center rounded-full bg-[var(--surface)]">
+            <span className="font-display text-sm font-extrabold tracking-tight" style={{ color: INK }}>
+              {score === null ? "–" : `${Math.round(score)}%`}
+            </span>
+          </div>
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <a
+            href={course.homeUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="pointer-events-auto line-clamp-2 text-sm font-bold leading-snug hover:underline"
+            style={{ color: INK }}
+            title={`Open ${course.name} in Canvas`}
+          >
+            {course.name}
+            <svg aria-hidden="true" viewBox="0 0 12 12" className="ml-1 inline-block h-2.5 w-2.5 opacity-60">
+              <path d="M3.5 2.5h6v6M9.5 2.5 2.5 9.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+          </a>
+          <p className="text-xs font-semibold" style={{ color: MUTED }}>
+            {score === null ? "No grade yet" : `${Number(score).toFixed(1)}%${course.grade ? ` · ${course.grade}` : ""}`}
+          </p>
+        </div>
       </div>
 
-      {hasNew && (
-        <div className="relative z-10 mt-2 rounded-lg bg-black/20 p-2">
-          <div className="mb-1 flex items-center justify-between gap-2 text-xs font-bold">
-            <span>
-              {newGrades.length} new grade{newGrades.length === 1 ? "" : "s"}
-            </span>
-            <button onClick={() => onSeen(newGrades)} className="rounded-full bg-white/25 px-2 py-0.5 hover:bg-white/35">
-              Got it
-            </button>
-          </div>
-          <ul className="space-y-0.5">
-            {newGrades.slice(0, 4).map((g) => (
-              <li key={g.key} className="flex items-baseline justify-between gap-2 text-xs">
-                <a
-                  href={g.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={() => onSeen([g])}
-                  className="truncate font-semibold hover:underline"
-                  title={g.name}
-                >
-                  {g.name}
-                </a>
-                <span className="shrink-0 font-extrabold">{scoreText(g)}</span>
-              </li>
-            ))}
-            {newGrades.length > 4 && <li className="text-xs opacity-80">and {newGrades.length - 4} more</li>}
-          </ul>
-        </div>
-      )}
-
-      <div className="relative z-10 mt-2 flex flex-wrap gap-1">
+      <div className="relative z-10 flex flex-wrap gap-1">
         {course.attendanceUrl && (
           <a
             href={course.attendanceUrl}
             target="_blank"
             rel="noreferrer"
-            className="rounded-full bg-white px-2.5 py-0.5 text-xs font-bold hover:bg-white/85"
-            style={{ color: course.color }}
+            className="c-tint c-text rounded-md px-2 py-0.5 text-[11px] font-bold hover:brightness-95"
             title="Open A+ Attendance for this class"
           >
             Check in
@@ -854,7 +834,8 @@ function GradeTile({ course, active, dimmed, onSelect, onWhatIf, newGrades, onSe
         )}
         <button
           onClick={onWhatIf}
-          className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-bold hover:bg-white/35"
+          className="rounded-md bg-[var(--chip)] px-2 py-0.5 text-[11px] font-bold hover:bg-[var(--surface-3)]"
+          style={{ color: INK }}
         >
           What-if
         </button>
@@ -862,11 +843,68 @@ function GradeTile({ course, active, dimmed, onSelect, onWhatIf, newGrades, onSe
           href={course.gradesUrl}
           target="_blank"
           rel="noreferrer"
-          className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-bold hover:bg-white/35"
+          className="rounded-md bg-[var(--chip)] px-2 py-0.5 text-[11px] font-bold hover:bg-[var(--surface-3)]"
+          style={{ color: INK }}
         >
           Grades
         </a>
+        {hasNew && (
+          <button
+            onClick={() => setOpen(!open)}
+            aria-expanded={open}
+            className="rounded-md px-2 py-0.5 text-[11px] font-extrabold hover:brightness-95"
+            style={{ background: "var(--green-bg)", color: "var(--green-fg)" }}
+          >
+            {newGrades.length} new
+          </button>
+        )}
       </div>
+
+      {hasNew && open && (
+        <>
+          {/* Clicking anywhere else closes the popover. */}
+          <button aria-label="Close" className="fixed inset-0 z-10 cursor-default" onClick={() => setOpen(false)} />
+          <div className="panel absolute left-3 right-3 top-full z-20 mt-2 p-3 shadow-lg" role="dialog" aria-label="New grades">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="text-xs font-extrabold" style={{ color: INK }}>
+                {newGrades.length} new grade{newGrades.length === 1 ? "" : "s"}
+              </span>
+              <button
+                onClick={() => {
+                  setOpen(false);
+                  onSeen(newGrades);
+                }}
+                className="btn btn-soft h-7 px-2.5 text-xs"
+              >
+                Got it
+              </button>
+            </div>
+            <ul className="space-y-1">
+              {newGrades.slice(0, 6).map((g) => (
+                <li key={g.key} className="flex items-baseline justify-between gap-2 text-xs">
+                  <a
+                    href={g.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() => onSeen([g])}
+                    className="truncate font-semibold hover:underline"
+                    style={{ color: "var(--ink-soft)" }}
+                    title={g.name}
+                  >
+                    {g.name}
+                  </a>
+                  <span className="c-text shrink-0 font-extrabold">{scoreText(g)}</span>
+                </li>
+              ))}
+              {newGrades.length > 6 && (
+                <li className="text-xs" style={{ color: MUTED }}>
+                  and {newGrades.length - 6} more
+                </li>
+              )}
+            </ul>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -936,30 +974,39 @@ function SmartCheckIn({ checkIn }) {
   );
 }
 
+const COLUMN_ACCENT = { todo: "var(--brand)", doing: "var(--amber-fg)", done: "var(--green-fg)" };
+
 function BoardColumn({ column, count, isDropTarget, children, ...dropHandlers }) {
+  const accent = COLUMN_ACCENT[column.id];
   return (
     <div
       {...dropHandlers}
-      className="flex min-h-[160px] flex-col rounded-2xl p-2 transition-colors xl:min-h-0"
+      className="flex min-h-[160px] flex-col rounded-2xl transition-colors xl:min-h-0"
       style={{
-        background: isDropTarget ? "var(--surface-3)" : "var(--surface-2)",
-        outline: isDropTarget ? `2px dashed ${INK}` : "none",
+        background: isDropTarget ? "var(--surface-2)" : "transparent",
+        outline: isDropTarget ? `2px dashed ${accent}` : "none",
       }}
     >
-      <h3 className="mb-2 flex flex-none items-center justify-between px-1 text-sm font-bold" style={{ color: INK }}>
+      <h3
+        className="mx-1 flex flex-none items-center gap-2 pb-1.5 text-sm font-extrabold"
+        style={{ color: INK, borderBottom: `3px solid ${accent}` }}
+      >
         {column.title}
-        <span className="rounded-full bg-[var(--surface)] px-2 text-xs" style={{ color: MUTED }}>
+        <span
+          className="grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[11px] font-extrabold"
+          style={{ background: `color-mix(in srgb, ${accent} 16%, transparent)`, color: accent }}
+        >
           {count}
         </span>
       </h3>
-      <div className="max-h-[70vh] min-h-0 flex-1 overflow-y-auto xl:max-h-none">{children}</div>
+      <div className="max-h-[70vh] min-h-0 flex-1 overflow-y-auto px-1 pb-2 pt-2.5 xl:max-h-none">{children}</div>
     </div>
   );
 }
 
 // `splitAt` (board columns only): cards before this index are due this week, the rest are
 // "Later". This week's cards are never hidden behind "Show more"; only Later folds up.
-function CardList({ cards, collapseAfter, renderCard, emptyText, splitAt }) {
+function CardList({ cards, collapseAfter, renderCard, emptyText, splitAt, listClassName = "flex flex-col gap-2" }) {
   const [expanded, setExpanded] = useState(false);
   if (cards.length === 0 && emptyText) {
     return (
@@ -975,6 +1022,7 @@ function CardList({ cards, collapseAfter, renderCard, emptyText, splitAt }) {
   const hasSections = splitAt !== undefined;
   return (
     <div className="flex flex-col gap-2">
+      <div className={listClassName}>
       {hasSections ? (
         <>
           <SectionLabel label="This week" count={split} accent />
@@ -990,12 +1038,9 @@ function CardList({ cards, collapseAfter, renderCard, emptyText, splitAt }) {
       ) : (
         cards.slice(0, limit).map(renderCard)
       )}
+      </div>
       {canCollapse && (
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="rounded-lg py-1.5 text-sm font-semibold hover:bg-[var(--surface)]"
-          style={{ color: INK }}
-        >
+        <button onClick={() => setExpanded(!expanded)} className="btn btn-soft h-8 text-sm">
           {expanded ? "Show fewer" : `Show ${cards.length - limit} more`}
         </button>
       )}
@@ -1071,11 +1116,12 @@ function TaskCard({
         onDragStart();
       }}
       onDragEnd={onDragEnd}
-      className="cursor-grab rounded-lg bg-[var(--surface)] px-2.5 py-2 active:cursor-grabbing"
-      style={{ borderLeft: `5px solid ${color}`, opacity: dragging ? 0.4 : syncing ? 0.6 : 1 }}
+      className="task-card cursor-grab rounded-xl px-3 py-2.5 active:cursor-grabbing"
+      style={{ "--c": color, opacity: dragging ? 0.4 : syncing ? 0.6 : 1 }}
     >
-      <p className="truncate text-xs font-bold" style={{ color }} title={courseName}>
-        {courseName}
+      <p className="c-text flex items-center gap-1.5 text-xs font-bold" title={courseName}>
+        <span className="c-dot h-2 w-2 shrink-0 rounded-full" aria-hidden="true" />
+        <span className="truncate">{courseName}</span>
       </p>
 
       {item.url ? (
@@ -1127,7 +1173,7 @@ function TaskCard({
         {column === "todo" && <MoveButton onClick={() => onMove("doing")}>Start</MoveButton>}
         {column === "doing" && <MoveButton onClick={() => onMove("todo")}>Back</MoveButton>}
         {!done && (
-          <MoveButton onClick={() => onMove("done")} strong color={color}>
+          <MoveButton onClick={() => onMove("done")} strong>
             Done
           </MoveButton>
         )}
@@ -1144,8 +1190,7 @@ function TaskCard({
             href={item.url}
             target="_blank"
             rel="noreferrer"
-            className="ml-auto shrink-0 text-xs font-bold hover:underline"
-            style={{ color }}
+            className="c-text ml-auto shrink-0 text-xs font-bold hover:underline"
           >
             Open
           </a>
@@ -1155,12 +1200,13 @@ function TaskCard({
   );
 }
 
-function MoveButton({ children, onClick, strong, color }) {
+// `strong` (Done) is tinted with the class color from the card's --c.
+function MoveButton({ children, onClick, strong }) {
   return (
     <button
       onClick={onClick}
-      className="rounded-md px-2 py-0.5 text-xs font-bold"
-      style={strong ? { background: color, color: "white" } : { background: "var(--chip)", color: INK }}
+      className={`rounded-md px-2 py-0.5 text-xs font-bold ${strong ? "btn-course" : "bg-[var(--chip)] hover:bg-[var(--surface-3)]"}`}
+      style={strong ? undefined : { color: INK }}
     >
       {children}
     </button>
@@ -1169,13 +1215,11 @@ function MoveButton({ children, onClick, strong, color }) {
 
 function AnnouncementCard({ announcement: a, now, unread, color, courseName, onRead, onDone }) {
   return (
-    <article
-      className="rounded-lg bg-[var(--surface)] px-3 py-2.5"
-      style={{ borderLeft: `5px solid ${color}`, opacity: unread ? 1 : 0.75 }}
-    >
-      <div className="flex items-baseline justify-between gap-2 text-xs">
-        <span className="truncate font-bold" style={{ color }} title={courseName}>
-          {courseName}
+    <article className="row-hover px-4 py-3" style={{ "--c": color, opacity: unread ? 1 : 0.72 }}>
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <span className="c-text flex min-w-0 items-center gap-1.5 font-bold" title={courseName}>
+          <span className="c-dot h-2 w-2 shrink-0 rounded-full" aria-hidden="true" />
+          <span className="truncate">{courseName}</span>
         </span>
         <span className="shrink-0 font-semibold" style={{ color: MUTED }}>
           {now ? timeAgo(a.postedAt, now) : "\u00A0"}
@@ -1186,12 +1230,10 @@ function AnnouncementCard({ announcement: a, now, unread, color, courseName, onR
         target="_blank"
         rel="noreferrer"
         onClick={onRead}
-        className="mt-0.5 flex items-start gap-1.5 text-sm font-bold leading-snug hover:underline"
+        className="mt-1 flex items-start gap-1.5 text-sm font-bold leading-snug hover:underline"
         style={{ color: INK }}
       >
-        {unread && (
-          <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: color }} aria-label="Unread" />
-        )}
+        {unread && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[var(--brand)]" aria-label="Unread" />}
         <span className="line-clamp-2">{a.title}</span>
       </a>
       {a.preview && (
@@ -1199,7 +1241,7 @@ function AnnouncementCard({ announcement: a, now, unread, color, courseName, onR
           {a.preview}
         </p>
       )}
-      <div className="mt-1.5 flex items-center justify-between gap-2 text-xs">
+      <div className="mt-2 flex items-center justify-between gap-2 text-xs">
         <span className="truncate" style={{ color: MUTED }}>
           {a.author}
         </span>
@@ -1209,11 +1251,7 @@ function AnnouncementCard({ announcement: a, now, unread, color, courseName, onR
               Mark read
             </button>
           )}
-          <button
-            onClick={onDone}
-            className="rounded-md px-2 py-0.5 font-bold text-white"
-            style={{ background: color }}
-          >
+          <button onClick={onDone} className="btn-course rounded-md px-2 py-0.5 font-bold">
             Done
           </button>
         </span>

@@ -173,6 +173,24 @@ textarea::placeholder {
 .btn-danger:hover:not(:disabled) { background: var(--red-fg); color: var(--surface); }
 .btn-danger:active:not(:disabled) { transform: scale(0.96); }
 
+/* Class colors: put the class color in --c on an element; these mix the soft tint and a
+   readable text color from it for the current theme, so custom colors work in light and dark. */
+.c-dot { background: var(--c); }
+.c-tint { background: color-mix(in srgb, var(--c) 14%, var(--surface)); }
+.c-text { color: color-mix(in srgb, var(--c) 70%, var(--ink)); }
+.btn-course { background: color-mix(in srgb, var(--c) 14%, var(--surface)); color: color-mix(in srgb, var(--c) 70%, var(--ink)); box-shadow: 0 2px 0 var(--c); }
+.btn-course:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 3px 0 var(--c); }
+.btn-course:active:not(:disabled) { transform: translateY(1px); box-shadow: 0 0 0 var(--c); }
+
+/* Surfaces: one white panel instead of many boxes, and cards that lift on hover. */
+.panel { background: var(--surface); border-radius: 1.25rem; box-shadow: 0 1px 2px var(--shadow); }
+.row-hover { transition: background-color 0.15s; }
+.row-hover:hover { background: var(--hover); }
+.task-card { background: var(--surface); box-shadow: 0 1px 2px var(--shadow), 0 2px 8px var(--shadow); transition: transform 0.14s, box-shadow 0.14s; }
+.task-card:hover { transform: translateY(-2px); box-shadow: inset 0 0 0 2px var(--c), 0 10px 24px var(--shadow); }
+.grade-ring { transition: transform 0.2s cubic-bezier(0.3, 1.5, 0.5, 1); }
+.grade-item:hover .grade-ring { transform: scale(1.06) rotate(-4deg); }
+
 /* Links styled as small text buttons. */
 .link-btn { font-weight: 700; cursor: pointer; transition: opacity 0.15s; }
 .link-btn:hover { text-decoration: underline; }
