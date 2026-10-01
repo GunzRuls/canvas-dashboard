@@ -88,4 +88,20 @@ Auto-start with Windows, desktop notifications (Canvas already notifies), study-
 
 - Explain changes plainly and briefly; he is learning as he goes.
 - Before committing, confirm `.env.local` and the three dashboard-*.json files (config, settings, dismissed) are not staged.
-- After changes, remind him to close the dashboard window, wait about a minute for the server to stop, and reopen from the desktop icon (the launcher rebuilds automatically).
+- After changes, remind him to close the dashboard window, wait about a minute for the server to stop, and reopen from the desktop icon (the launcher rebuilds automatically). Note: if his desktop icon points at the installed copy (`%LOCALAPPDATA%\Programs\School Dashboard`), changes only reach it through a new release, so show him the dev server instead.
+- End every finished chunk of work with a short rundown: "Just finished" and "Next up" (plus any decisions waiting on him), so he can keep track. Do this without being asked.
+- He works from more than one PC. Run `git pull` before starting and push when a piece is done; if another Claude may be working at the same time, stick to separate files or use a branch.
+
+## Build tracker (shared kanban board)
+
+He and Claude plan work on a private kanban board: https://claude.ai/artifact/4yzFjBMCYvtZmE3Gz7k15P (only his account can open it, so any Claude session signed in as him can use it). Read and write cards with the `ArtifactData` tool on that URL; never republish the page itself unless asked (if you must, read it first with the `Artifact` tool and keep its `db` capability).
+
+- Cards live in collection `tasks`, doc id = task id lowercased (`dash-6`). Fields: `id, title, note, status, next, github, installer, createdBy ("you"|"claude"), createdAt, updatedAt, seen, thread`, plus mirrors of the latest messages: his `decision ("good"|"revise"), yourNote, yourAt`, Claude's `claudeNote, claudeAt`, and `sealedAt/reopenedAt`.
+- `status` columns: `backlog`, `progress` (Claude working), `you` (needs his pick/test/answer), `revise` (he asked for changes), `ready` (done and pushed; he can seal), `sealed`, and `parked` (a folded "Parked ideas" drawer, not a column). His "Needs revision" moves a card to `revise`, "Good to go" to `ready`.
+- **Only he seals.** Never set `sealed`. Sealed cards can be reopened (→ `revise`).
+- **`thread`** is the full conversation per card: `[{by: "you"|"claude", decision, text, at}]`, oldest first. Always read the card, append one entry, and write the whole array back pinned with `if_version`; never replace or drop entries (he once lost a comment that way). If the write is refused because the card changed, re-read and redo it.
+- Timestamps: take the real time from the shell (`date -u +%Y-%m-%dT%H:%M:%SZ`) right before writing; never guess.
+- When he says "check the tracker" (and at the start of a work round): `query` `tasks` where `seen == false`, plus `get` `feedback/general` (his general notes: `yourNote/yourAt`; answer with `claudeNote/claudeAt`). Act on them, then update each card with the reply, `seen: true`, and the new `status`/`next`.
+- Move cards as work progresses (`progress` → `you` or `ready`) and set `github: true` when pushed, `installer: true` when in a published release.
+- New cards get the next number in their area. Areas: DASH Dashboard, CLASS Classes, CAL Calendars, MAIL Email, SET Settings, SAFE Safety, REL Releases, PARK Parked. IDs never change.
+- Write card text plainly for him (no file paths needed). Label any preview built on made-up data as "example data".
