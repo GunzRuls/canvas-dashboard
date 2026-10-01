@@ -206,7 +206,8 @@ export default function NextClassCard({ now, courses, sessions, items, status, a
               {" · "}
             </>
           )}
-          {dayName && state === "tomorrow" ? `${dayName.slice(0, 3)} · ` : ""}
+          {/* The pill already says "Tomorrow"; other days get a short weekday here. */}
+          {state === "tomorrow" && card.daysAway !== 1 ? `${dayName.slice(0, 3)} · ` : ""}
           {timeText}
         </p>
         {state === "now" && (

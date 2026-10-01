@@ -35,15 +35,11 @@ const TYPE_LABELS = {
 
 // ---------- date helpers (only run in the browser, so times use your timezone) ----------
 
-function formatDue(iso) {
+// "Oct 5 · 5:00 PM" for the compact board cards.
+function formatDueShort(iso) {
   if (!iso) return "No due date";
-  return new Date(iso).toLocaleString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  const d = new Date(iso);
+  return `${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })} · ${d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
 }
 
 function startOfDay(ms) {
@@ -117,7 +113,6 @@ export default function Dashboard({
   events = [],
   calendarEnabled = false,
   calendarError = null,
-  hiddenEvents = [],
   digestEnabled = false,
   newGrades = [],
   sessions = [],
@@ -449,35 +444,36 @@ export default function Dashboard({
     : "\u00A0";
   const filteredCourse = filter ? courseById[filter] : null;
 
+  // Layout A ("Command sidebar", DASH-6). On wide windows (xl) everything fits one screen:
+  // top bar, then a left sidebar (Next class + Grades list) beside the main area (a slim
+  // 7-day strip over [board | announcements]). Each panel scrolls on its own, so the board gets
+  // most of the height. Narrower windows stack the same pieces and the page scrolls.
   return (
-    <main className="flex min-h-screen flex-col gap-4 px-4 py-4 sm:px-6 xl:h-screen xl:overflow-y-auto">
-      {/* Top bar */}
-      <header className="flex flex-none flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="font-display text-2xl font-extrabold tracking-tight sm:text-3xl" style={{ color: INK }}>
-            {today}
-          </h1>
+    <main className="flex min-h-screen flex-col gap-4 px-4 py-4 sm:px-5 xl:h-screen xl:gap-3.5 xl:overflow-y-auto">
+      {/* Top bar: one row on wide windows */}
+      <header className="flex flex-none flex-wrap items-center gap-x-4 gap-y-3 min-[90rem]:flex-nowrap">
+        <h1 className="font-display whitespace-nowrap text-2xl font-extrabold tracking-tight xl:text-[26px]" style={{ color: INK }}>
+          {today}
+        </h1>
+        <div className="panel flex min-h-[34px] flex-wrap items-center gap-x-1 rounded-full px-2.5 py-0.5">
+          <Stat value={dueThisWeek} label="due this week" color="var(--blue-fg)" />
+          <Stat value={overdue} label="overdue" color={overdue ? "var(--red-fg)" : "var(--line-2)"} />
+          <Stat value={unreadCount} label="unread" color="var(--purple-fg)" />
+          {liveGrades.length > 0 && (
+            <Stat
+              value={liveGrades.length}
+              label={liveGrades.length === 1 ? "new grade" : "new grades"}
+              color="var(--green-fg)"
+            />
+          )}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="panel flex h-10 flex-wrap items-center gap-1 rounded-full px-3">
-            <Stat value={dueThisWeek} label="due this week" color="var(--blue-fg)" />
-            <Stat value={overdue} label="overdue" color={overdue ? "var(--red-fg)" : "var(--line-2)"} />
-            <Stat value={unreadCount} label="unread" color="var(--purple-fg)" />
-            {liveGrades.length > 0 && (
-              <Stat
-                value={liveGrades.length}
-                label={liveGrades.length === 1 ? "new grade" : "new grades"}
-                color="var(--green-fg)"
-              />
-            )}
-          </div>
-          <span className="mx-1 hidden h-6 w-px bg-[var(--line)] sm:block" />
+        <div className="flex flex-wrap items-center gap-2 xl:ml-auto">
           <TopButton onClick={toggleTheme} label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
             {theme === "dark" ? "Light mode" : "Dark mode"}
           </TopButton>
           <TopButton onClick={() => setManaging(true)}>Manage classes</TopButton>
           {/* Opens Settings as a pop-up over the dashboard (app/@modal/(.)setup). */}
-          <Link href="/setup" scroll={false} className="btn btn-secondary h-10 px-3.5 text-sm">
+          <Link href="/setup" scroll={false} className="btn btn-secondary h-[38px] px-3.5 text-sm">
             Settings
           </Link>
           <UpdateNotice />
@@ -493,84 +489,105 @@ export default function Dashboard({
         </div>
       </header>
 
-      {/* Next class | next 7 days */}
-      <section className="grid flex-none grid-cols-1 gap-4 xl:grid-cols-[340px_minmax(0,1fr)]" aria-label="Next class and the next 7 days">
-        <NextClassCard
-          now={now}
-          courses={courses}
-          sessions={sessions}
-          items={items}
-          status={status}
-          announcements={announcements.filter((a) => !dismissedIds.has(a.id))}
-          readIds={readIds}
-          onRead={markRead}
-          onAddTimes={() => setManaging(true)}
-        />
-        <div className="flex min-w-0 flex-col">
-        {calendarError && (
-          <p className="mb-2 text-sm font-semibold" style={{ color: "var(--red-fg)" }}>
-            Your calendar didn't load: {calendarError}
-          </p>
-        )}
-        <WeekStrip
-          items={visibleItems}
-          status={status}
-          events={events}
-          calendarEnabled={calendarEnabled}
-          hiddenEvents={hiddenEvents}
-          now={now}
-          colorFor={colorFor}
-          nameFor={nameFor}
-        />
-        </div>
-      </section>
-
-      {/* Grades: one row of rings */}
-      <section className="flex-none" aria-labelledby="grades-heading">
-        <PanelHeading id="grades-heading" title="Grades">
-          {filter ? (
-            <button onClick={() => setFilter(null)} className="text-xs font-bold underline" style={{ color: INK }}>
-              Show all classes
-            </button>
-          ) : (
-            <span className="text-xs" style={{ color: MUTED }}>Click a class to focus on it</span>
-          )}
-        </PanelHeading>
-        {courses.length === 0 ? (
-          <Empty text="No classes to show. Use Manage classes to unhide one." />
-        ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[repeat(auto-fit,minmax(210px,1fr))]">
-            {courses.map((c) => (
-              <GradeRing
-                key={c.id}
-                course={c}
-                active={filter === c.id}
-                dimmed={Boolean(filter) && filter !== c.id}
-                onSelect={() => setFilter(filter === c.id ? null : c.id)}
-                onWhatIf={() => setWhatIfCourse(c)}
-                newGrades={gradesByCourse[c.id] || []}
-                onSeen={(list) => markGradesSeen(list)}
-              />
-            ))}
+      <div className="flex flex-col gap-4 xl:min-h-[520px] xl:flex-1 xl:flex-row">
+        {/* Sidebar: Next class, then every class's grade */}
+        <aside
+          className="flex flex-col gap-4 xl:min-h-0 xl:w-[288px] xl:flex-none xl:gap-3.5 min-[90rem]:w-[320px]"
+          aria-label="Your classes"
+        >
+          <div className="flex-none">
+            <NextClassCard
+              now={now}
+              courses={courses}
+              sessions={sessions}
+              items={items}
+              status={status}
+              announcements={announcements.filter((a) => !dismissedIds.has(a.id))}
+              readIds={readIds}
+              onRead={markRead}
+              onAddTimes={() => setManaging(true)}
+            />
           </div>
-        )}
-      </section>
 
-      {/* Board | Announcements */}
-      <div className="grid grid-cols-1 gap-5 xl:min-h-[420px] xl:flex-1 xl:grid-cols-[minmax(0,1fr)_380px] xl:grid-rows-1">
-        {/* Board */}
-        <section className="flex min-h-0 flex-col" aria-labelledby="board-heading">
-          <PanelHeading id="board-heading" title={filteredCourse ? `Assignments: ${filteredCourse.name}` : "Assignments"}>
-            <span className="text-xs" style={{ color: MUTED }}>Done marks it complete in Canvas</span>
-          </PanelHeading>
-          <QuickAdd
-            courses={courses}
-            onAdded={() => {
-              setToast({ tone: "ok", text: "To-do added to Canvas" });
-              refresh();
-            }}
-            onError={(text) => setToast({ tone: "error", text })}
+          <section className="panel flex flex-col px-2.5 pb-2 pt-3 xl:min-h-[160px] xl:flex-1" aria-labelledby="grades-heading">
+            <div className="flex flex-none items-baseline justify-between gap-2 px-2 pb-1.5">
+              <h2 id="grades-heading" className="font-display text-lg font-extrabold tracking-tight" style={{ color: INK }}>
+                Grades
+              </h2>
+              {filter ? (
+                <button onClick={() => setFilter(null)} className="text-link text-xs font-bold underline" style={{ color: INK }}>
+                  Show all classes
+                </button>
+              ) : (
+                <span className="text-xs" style={{ color: MUTED }}>Click a class to focus on it</span>
+              )}
+            </div>
+            {courses.length === 0 ? (
+              <Empty text="No classes to show. Use Manage classes to unhide one." />
+            ) : (
+              <div className="grid min-h-0 grid-cols-1 gap-0.5 sm:grid-cols-2 xl:flex-1 xl:grid-cols-1 xl:content-start xl:overflow-y-auto">
+                {courses.map((c) => (
+                  <GradeRow
+                    key={c.id}
+                    course={c}
+                    active={filter === c.id}
+                    dimmed={Boolean(filter) && filter !== c.id}
+                    onSelect={() => setFilter(filter === c.id ? null : c.id)}
+                    onWhatIf={() => setWhatIfCourse(c)}
+                    newGrades={gradesByCourse[c.id] || []}
+                    onSeen={(list) => markGradesSeen(list)}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        </aside>
+
+        {/* Main area: slim 7-day strip, then board | announcements */}
+        <div className="flex min-w-0 flex-col gap-4 xl:min-h-0 xl:flex-1 xl:gap-3.5">
+          <WeekStrip
+            items={visibleItems}
+            status={status}
+            events={events}
+            calendarEnabled={calendarEnabled}
+            calendarError={calendarError}
+            now={now}
+            colorFor={colorFor}
+            nameFor={nameFor}
           />
+
+      <div className="grid grid-cols-1 gap-5 xl:min-h-[300px] xl:flex-1 xl:grid-cols-[minmax(0,1fr)_260px] xl:grid-rows-1 xl:gap-4 min-[90rem]:grid-cols-[minmax(0,1fr)_300px]">
+        {/* Board */}
+        <section className="flex min-h-0 min-w-0 flex-col" aria-labelledby="board-heading">
+          {/* Heading row: title, the "Only X" filter chip, and the quick-add bar. */}
+          <div className="mb-2.5 flex flex-none flex-wrap items-center gap-x-3 gap-y-2">
+            <h2 id="board-heading" className="font-display text-xl font-extrabold tracking-tight" style={{ color: INK }}>
+              Assignments
+            </h2>
+            {filteredCourse && (
+              <button
+                onClick={() => setFilter(null)}
+                className="btn h-7 max-w-[180px] rounded-full bg-[var(--inverse)] pl-3 pr-2.5 text-xs text-[var(--inverse-fg)] hover:opacity-90"
+                title="Show all classes"
+              >
+                <span className="truncate">Only {filteredCourse.name}</span>
+                <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[11px] w-[11px] shrink-0" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            )}
+            {/* QuickAdd keeps its own look; here it just loses its bottom margin and fits the row. */}
+            <div className="min-w-[min(100%,420px)] flex-1 [&>form]:mb-0 [&>form]:shadow-[0_1px_2px_var(--shadow)] md:[&>form]:flex-nowrap md:[&_#quick-title]:min-w-[80px] md:[&_#quick-class]:max-w-[140px]">
+              <QuickAdd
+                courses={courses}
+                onAdded={() => {
+                  setToast({ tone: "ok", text: "To-do added to Canvas" });
+                  refresh();
+                }}
+                onError={(text) => setToast({ tone: "error", text })}
+              />
+            </div>
+          </div>
           <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 md:grid-cols-3 xl:grid-rows-1">
             {COLUMNS.map((col) => {
               // `now` is set after the page loads; until then use the server's load time so
@@ -641,20 +658,24 @@ export default function Dashboard({
         </section>
 
         {/* Announcements */}
-        <section className="flex min-h-0 flex-col" aria-labelledby="announcements-heading">
-          <PanelHeading id="announcements-heading" title="Announcements">
+        <section className="flex min-h-0 min-w-0 flex-col" aria-labelledby="announcements-heading">
+          {/* Same height as the Assignments heading row, so both lists start on one line. */}
+          <div className="mb-2.5 flex flex-none items-center justify-between gap-2 md:min-h-[44px]">
+            <h2 id="announcements-heading" className="font-display truncate text-xl font-extrabold tracking-tight" style={{ color: INK }}>
+              Announcements
+            </h2>
             {visibleAnnouncements.length > 0 ? (
               <button
                 onClick={() => dismissAnnouncements(visibleAnnouncements)}
-                className="text-xs font-bold underline"
+                className="text-link shrink-0 text-xs font-bold underline"
                 style={{ color: INK }}
               >
                 Clear {filter ? "these" : "all"} ({visibleAnnouncements.length})
               </button>
             ) : (
-              <span className="text-xs" style={{ color: MUTED }}>Newest first</span>
+              <span className="shrink-0 text-xs" style={{ color: MUTED }}>Newest first</span>
             )}
-          </PanelHeading>
+          </div>
           <div className="min-h-0 flex-1 xl:overflow-y-auto xl:pr-1">
             {visibleAnnouncements.length === 0 ? (
               <EmptyState kind="news" />
@@ -681,8 +702,10 @@ export default function Dashboard({
           </div>
         </section>
       </div>
+        </div>
+      </div>
 
-      {whatIfCourse && <WhatIfPanel course={whatIfCourse} onClose={() => setWhatIfCourse(null)} />}
+      {whatIfCourse &&<WhatIfPanel course={whatIfCourse} onClose={() => setWhatIfCourse(null)} />}
       {managing && (
         <ManageClasses
           allCourses={allCourses}
@@ -738,24 +761,13 @@ function readSetFrom(items, announcements) {
 
 // ---------- pieces ----------
 
-function PanelHeading({ id, title, children }) {
-  return (
-    <div className="mb-2 flex flex-none items-baseline justify-between gap-2">
-      <h2 id={id} className="font-display truncate text-xl font-extrabold tracking-tight" style={{ color: INK }}>
-        {title}
-      </h2>
-      {children}
-    </div>
-  );
-}
-
 function TopButton({ children, onClick, disabled, strong, label }) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
-      className={`btn ${strong ? "btn-primary" : "btn-secondary"} h-10 px-3.5 text-sm`}
+      className={`btn ${strong ? "btn-primary" : "btn-secondary"} h-[38px] px-3.5 text-sm`}
     >
       {children}
     </button>
@@ -783,117 +795,111 @@ function formatNumber(n) {
   return Number.isInteger(Number(n)) ? String(n) : Number(n).toFixed(1);
 }
 
-function GradeRing({ course, active, dimmed, onSelect, onWhatIf, newGrades, onSeen }) {
+// One class in the sidebar's Grades list: a small ring, the name (opens the course home), code and
+// grade, then Check in / What-if / Grades and the "N new" chip. Clicking the row anywhere that isn't
+// a link or button focuses the page on this class. New grades open inline (no pop-over), so the
+// list can scroll without cutting it off.
+function GradeRow({ course, active, dimmed, onSelect, onWhatIf, newGrades, onSeen }) {
   const [open, setOpen] = useState(false);
   const score = course.score;
   const hasNew = newGrades.length > 0;
   const pct = score === null ? 0 : Math.max(0, Math.min(100, Number(score)));
+  const code = displayCode(course);
+  const chip = "pointer-events-auto rounded-md px-2 py-0.5 text-[11px] font-bold";
   return (
     <div
-      className="grade-item panel relative flex flex-col gap-2 p-3 transition-opacity"
+      className={`grade-item relative flex gap-3 rounded-2xl px-2 py-1.5 transition-opacity ${active ? "c-tint" : "row-hover"}`}
       style={{
         "--c": course.color,
         opacity: dimmed ? 0.45 : 1,
-        zIndex: open ? 30 : undefined,
-        boxShadow: active ? `0 0 0 2px var(--bg), 0 0 0 4px ${course.color}` : undefined,
+        boxShadow: active ? "inset 0 0 0 1.5px var(--c)" : undefined,
       }}
     >
-      {/* Clicking the card (anywhere that isn't a link or button) focuses the page on this class. */}
       <button
         onClick={onSelect}
         aria-pressed={active}
         aria-label={`Show only ${course.name}`}
-        className="absolute inset-0 rounded-[1.25rem]"
+        title={active ? "Show all classes" : "Show only this class"}
+        className="absolute inset-0 rounded-2xl"
       />
-      <div className="pointer-events-none relative flex items-center gap-3">
-        <div
-          className="grade-ring relative grid h-14 w-14 shrink-0 place-items-center rounded-full"
-          style={{
-            background: `conic-gradient(var(--c) ${pct * 3.6}deg, color-mix(in srgb, var(--c) 16%, var(--surface-2)) 0)`,
-          }}
-          aria-hidden="true"
-        >
-          <div className="grid h-11 w-11 place-items-center rounded-full bg-[var(--surface)]">
-            <span className="font-display text-sm font-extrabold tracking-tight" style={{ color: INK }}>
-              {score === null ? "–" : `${Math.round(score)}%`}
-            </span>
-          </div>
+      <div
+        className="grade-ring pointer-events-none relative mt-0.5 grid h-[46px] w-[46px] shrink-0 place-items-center rounded-full"
+        style={{
+          background: `conic-gradient(var(--c) ${pct * 3.6}deg, color-mix(in srgb, var(--c) 16%, var(--surface-2)) 0)`,
+        }}
+        aria-hidden="true"
+      >
+        <div className="grid h-[34px] w-[34px] place-items-center rounded-full bg-[var(--surface)]">
+          <span className="font-display text-[11px] font-extrabold tracking-tight" style={{ color: INK }}>
+            {score === null ? "–" : `${Math.round(score)}%`}
+          </span>
         </div>
+      </div>
 
-        <div className="min-w-0 flex-1">
+      <div className="pointer-events-none relative flex min-w-0 flex-1 flex-col gap-0.5">
+        <div className="flex min-w-0 items-center gap-1.5">
           <a
             href={course.homeUrl}
             target="_blank"
             rel="noreferrer"
-            className="pointer-events-auto line-clamp-2 text-sm font-bold leading-snug hover:underline"
+            className="pointer-events-auto flex min-w-0 items-center gap-1 text-sm font-bold leading-snug hover:underline"
             style={{ color: INK }}
             title={`Open ${course.name} in Canvas`}
           >
-            {course.name}
-            <svg aria-hidden="true" viewBox="0 0 12 12" className="ml-1 inline-block h-2.5 w-2.5 opacity-60">
+            <span className="truncate">{course.name}</span>
+            <svg aria-hidden="true" viewBox="0 0 12 12" className="h-2.5 w-2.5 shrink-0 opacity-60">
               <path d="M3.5 2.5h6v6M9.5 2.5 2.5 9.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
           </a>
-          <p className="text-xs font-semibold tabular-nums" style={{ color: MUTED }}>
-            {displayCode(course) && (
-              <>
-                <span className="c-text font-bold">{displayCode(course)}</span>
-                {" · "}
-              </>
-            )}
-            <span className="whitespace-nowrap">
-              {score === null ? "No grade yet" : `${Number(score).toFixed(1)}%${course.grade ? ` · ${course.grade}` : ""}`}
-            </span>
-          </p>
+          {hasNew && (
+            <button
+              onClick={() => setOpen(!open)}
+              aria-expanded={open}
+              className={`${chip} ml-auto shrink-0 font-extrabold hover:brightness-95`}
+              style={{ background: "var(--green-bg)", color: "var(--green-fg)" }}
+            >
+              {newGrades.length} new
+            </button>
+          )}
         </div>
-      </div>
-
-      <div className="relative z-10 flex flex-wrap gap-1">
-        {course.attendanceUrl && (
+        <p className="truncate text-xs font-semibold tabular-nums" style={{ color: MUTED }}>
+          {code && (
+            <>
+              <span className="c-text font-bold">{code}</span>
+              {" · "}
+            </>
+          )}
+          {score === null ? "No grade yet" : `${Number(score).toFixed(1)}%${course.grade ? ` · ${course.grade}` : ""}`}
+        </p>
+        <div className="mt-0.5 flex flex-wrap gap-1">
+          {course.attendanceUrl && (
+            <a
+              href={course.attendanceUrl}
+              target="_blank"
+              rel="noreferrer"
+              className={`${chip} c-tint c-text hover:brightness-95`}
+              title="Open A+ Attendance for this class"
+            >
+              Check in
+            </a>
+          )}
+          <button onClick={onWhatIf} className={`${chip} bg-[var(--chip)] hover:bg-[var(--surface-3)]`} style={{ color: INK }}>
+            What-if
+          </button>
           <a
-            href={course.attendanceUrl}
+            href={course.gradesUrl}
             target="_blank"
             rel="noreferrer"
-            className="c-tint c-text rounded-md px-2 py-0.5 text-[11px] font-bold hover:brightness-95"
-            title="Open A+ Attendance for this class"
+            className={`${chip} bg-[var(--chip)] hover:bg-[var(--surface-3)]`}
+            style={{ color: INK }}
           >
-            Check in
+            Grades
           </a>
-        )}
-        <button
-          onClick={onWhatIf}
-          className="rounded-md bg-[var(--chip)] px-2 py-0.5 text-[11px] font-bold hover:bg-[var(--surface-3)]"
-          style={{ color: INK }}
-        >
-          What-if
-        </button>
-        <a
-          href={course.gradesUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="rounded-md bg-[var(--chip)] px-2 py-0.5 text-[11px] font-bold hover:bg-[var(--surface-3)]"
-          style={{ color: INK }}
-        >
-          Grades
-        </a>
-        {hasNew && (
-          <button
-            onClick={() => setOpen(!open)}
-            aria-expanded={open}
-            className="rounded-md px-2 py-0.5 text-[11px] font-extrabold hover:brightness-95"
-            style={{ background: "var(--green-bg)", color: "var(--green-fg)" }}
-          >
-            {newGrades.length} new
-          </button>
-        )}
-      </div>
+        </div>
 
-      {hasNew && open && (
-        <>
-          {/* Clicking anywhere else closes the popover. */}
-          <button aria-label="Close" className="fixed inset-0 z-10 cursor-default" onClick={() => setOpen(false)} />
-          <div className="panel absolute left-3 right-3 top-full z-20 mt-2 p-3 shadow-lg" role="dialog" aria-label="New grades">
-            <div className="mb-2 flex items-center justify-between gap-2">
+        {hasNew && open && (
+          <div className="pointer-events-auto mt-1.5 rounded-xl bg-[var(--surface)] p-2.5 shadow-[0_0_0_1px_var(--line)]" role="group" aria-label="New grades">
+            <div className="mb-1.5 flex items-center justify-between gap-2">
               <span className="text-xs font-extrabold" style={{ color: INK }}>
                 {newGrades.length} new grade{newGrades.length === 1 ? "" : "s"}
               </span>
@@ -931,8 +937,8 @@ function GradeRing({ course, active, dimmed, onSelect, onWhatIf, newGrades, onSe
               )}
             </ul>
           </div>
-        </>
-      )}
+        )}
+      </div>
     </div>
   );
 }
@@ -953,6 +959,7 @@ function BoardColumn({ column, count, isDropTarget, children, ...dropHandlers })
       <h3
         className="mx-1 flex flex-none items-center gap-2 pb-1.5 text-sm font-extrabold"
         style={{ color: INK, borderBottom: `3px solid ${accent}` }}
+        title={column.id === "done" ? "Done marks it complete in Canvas" : undefined}
       >
         {column.title}
         <span
@@ -1020,7 +1027,7 @@ function SectionLabel({ label, count, accent }) {
 
 function Badge({ text, bg, fg }) {
   return (
-    <span className="rounded-md px-1.5 py-px text-[11px] font-bold" style={{ background: bg, color: fg }}>
+    <span className="shrink-0 whitespace-nowrap rounded-md px-1.5 py-px text-[11px] font-bold" style={{ background: bg, color: fg }}>
       {text}
     </span>
   );
@@ -1057,15 +1064,18 @@ function TaskCard({
   newGrade,
 }) {
   const isNote = item.type === "planner_note";
-  const due = now ? dueBadge(item.dueAt, now, column === "done") : null;
+  const done = column === "done";
+  // The due pill sits top-right; in Done the short date goes there instead.
+  const due = now ? dueBadge(item.dueAt, now, done) : null;
   const badges = [
     ...(newGrade ? [{ text: `New grade: ${scoreText(newGrade)}`, bg: "var(--green-bg)", fg: "var(--green-fg)" }] : []),
-    ...(due ? [due] : []),
     ...statusBadges(item.submissions, item.newActivity),
   ];
-  const done = column === "done";
+  const kind = `${TYPE_LABELS[item.type] || "Item"}${item.points ? `, ${item.points} pts` : ""}`;
   const titleStyle = { color: INK, textDecoration: done ? "line-through" : undefined };
 
+  // Compact card (Layout A): class + due on one line, the title on one line (full title on hover),
+  // then date, status badges and the actions on the last line, so a column shows ~5 cards.
   return (
     <article
       draggable
@@ -1074,42 +1084,42 @@ function TaskCard({
         onDragStart();
       }}
       onDragEnd={onDragEnd}
-      className="task-card cursor-grab rounded-xl px-3 py-2.5 active:cursor-grabbing"
+      className="task-card flex cursor-grab flex-col gap-1 rounded-xl px-3 py-2 active:cursor-grabbing"
       style={{ "--c": color, opacity: dragging ? 0.4 : syncing ? 0.6 : 1 }}
     >
-      <p className="c-text flex items-center gap-1.5 text-xs font-bold" title={courseCode ? `${courseName} (${courseCode})` : courseName}>
-        <span className="c-dot h-2 w-2 shrink-0 rounded-full" aria-hidden="true" />
-        <span className="truncate">{courseName}</span>
-        <CourseCode code={courseCode} />
-      </p>
+      <div className="flex min-w-0 items-center gap-2">
+        <p className="c-text flex min-w-0 flex-1 items-center gap-1.5 text-xs font-bold" title={courseCode ? `${courseName} (${courseCode})` : courseName}>
+          <span className="c-dot h-2 w-2 shrink-0 rounded-full" aria-hidden="true" />
+          <span className="truncate">{courseName}</span>
+          <CourseCode code={courseCode} />
+        </p>
+        {due && <Badge {...due} />}
+        {done && now && item.dueAt && (
+          <span className="shrink-0 text-xs" style={{ color: MUTED }}>
+            {new Date(item.dueAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+          </span>
+        )}
+      </div>
 
       {item.url ? (
         <a
           href={item.url}
           target="_blank"
           rel="noreferrer"
-          className="mt-0.5 line-clamp-2 text-sm font-bold leading-snug hover:underline"
+          className="truncate text-sm font-bold leading-snug hover:underline"
           style={titleStyle}
+          title={item.title}
         >
           {item.title}
         </a>
       ) : (
-        <p className="mt-0.5 line-clamp-2 text-sm font-bold leading-snug" style={titleStyle}>
+        <p className="truncate text-sm font-bold leading-snug" style={titleStyle} title={item.title}>
           {item.title}
         </p>
       )}
 
-      <div className="mt-1 flex flex-wrap items-center gap-1">
-        <span className="mr-0.5 text-xs" style={{ color: MUTED }}>
-          {now ? formatDue(item.dueAt) : "\u00A0"}
-        </span>
-        {badges.map((b) => (
-          <Badge key={b.text} {...b} />
-        ))}
-      </div>
-
       {item.announcements?.length > 0 && (
-        <div className="mt-1.5 flex flex-col gap-1">
+        <div className="flex flex-col gap-1">
           {item.announcements.map((a) => (
             <a
               key={a.id}
@@ -1128,32 +1138,50 @@ function TaskCard({
         </div>
       )}
 
-      <div className="mt-1.5 flex items-center gap-1">
-        {column === "todo" && <MoveButton onClick={() => onMove("doing")}>Start</MoveButton>}
-        {column === "doing" && <MoveButton onClick={() => onMove("todo")}>Back</MoveButton>}
+      {/* Date and badges flow left; the buttons stay together on the right and only drop to a
+          new line when the badges need the room. */}
+      <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1">
         {!done && (
-          <MoveButton onClick={() => onMove("done")} strong>
-            Done
-          </MoveButton>
+          <span className="mr-0.5 whitespace-nowrap text-xs" style={{ color: MUTED }} title={kind}>
+            {syncing ? "Saving…" : now ? formatDueShort(item.dueAt) : "\u00A0"}
+          </span>
         )}
-        {done && <MoveButton onClick={() => onMove("todo")}>Reopen</MoveButton>}
-        <span className="ml-1 truncate text-[11px] font-semibold" style={{ color: MUTED }}>
-          {syncing ? "Saving…" : `${TYPE_LABELS[item.type] || "Item"}${item.points ? `, ${item.points} pts` : ""}`}
-        </span>
-        {isNote ? (
-          <button onClick={onDelete} className="ml-auto shrink-0 text-xs font-bold hover:underline" style={{ color: "var(--red-fg)" }}>
-            Delete
-          </button>
-        ) : (
-          <a
-            href={item.url}
-            target="_blank"
-            rel="noreferrer"
-            className="c-text ml-auto shrink-0 text-xs font-bold hover:underline"
-          >
-            Open
-          </a>
+        {done && syncing && (
+          <span className="mr-0.5 text-xs" style={{ color: MUTED }}>
+            Saving…
+          </span>
         )}
+        {badges.map((b) => (
+          <Badge key={b.text} {...b} />
+        ))}
+        <div className="ml-auto flex shrink-0 items-center gap-1">
+          {column === "todo" && <MoveButton onClick={() => onMove("doing")}>Start</MoveButton>}
+          {column === "doing" && <MoveButton onClick={() => onMove("todo")}>Back</MoveButton>}
+          {!done && (
+            <MoveButton onClick={() => onMove("done")} strong>
+              Done
+            </MoveButton>
+          )}
+          {done && <MoveButton onClick={() => onMove("todo")}>Reopen</MoveButton>}
+          {isNote ? (
+            <button onClick={onDelete} className="ml-1 shrink-0 text-xs font-bold hover:underline" style={{ color: "var(--red-fg)" }}>
+              Delete
+            </button>
+          ) : (
+            <a
+              href={item.url}
+              target="_blank"
+              rel="noreferrer"
+              className="c-text grid h-6 w-6 shrink-0 place-items-center rounded-md transition-colors hover:bg-[var(--surface-2)]"
+              aria-label={`Open ${item.title} in Canvas`}
+              title={`Open in Canvas (${kind})`}
+            >
+              <svg aria-hidden="true" viewBox="0 0 12 12" className="h-3 w-3">
+                <path d="M3.5 2.5h6v6M9.5 2.5 2.5 9.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            </a>
+          )}
+        </div>
       </div>
     </article>
   );
@@ -1164,7 +1192,7 @@ function MoveButton({ children, onClick, strong }) {
   return (
     <button
       onClick={onClick}
-      className={`rounded-md px-2 py-0.5 text-xs font-bold ${strong ? "btn-course" : "bg-[var(--chip)] hover:bg-[var(--surface-3)]"}`}
+      className={`h-6 shrink-0 rounded-md px-2.5 text-xs font-bold ${strong ? "btn-course" : "bg-[var(--chip)] hover:bg-[var(--surface-3)]"}`}
       style={strong ? undefined : { color: INK }}
     >
       {children}
