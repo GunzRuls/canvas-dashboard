@@ -7,6 +7,7 @@ import WeekStrip from "./WeekStrip";
 import QuickAdd from "./QuickAdd";
 import WhatIfPanel from "./WhatIfPanel";
 import ManageClasses from "./ManageClasses";
+import EmptyState from "./EmptyState";
 import UpdateNotice from "./UpdateNotice";
 import AccountChip from "./AccountChip";
 import NextClassCard from "./NextClassCard";
@@ -631,13 +632,7 @@ export default function Dashboard({
                         newGrade={gradeForItem(item)}
                       />
                     )}
-                    emptyText={
-                      col.id === "todo"
-                        ? "Nothing left to start."
-                        : col.id === "doing"
-                        ? "Drag a card here when you start it."
-                        : "Finished work lands here."
-                    }
+                    emptyKind={col.id}
                   />
                 </BoardColumn>
               );
@@ -662,7 +657,7 @@ export default function Dashboard({
           </PanelHeading>
           <div className="min-h-0 flex-1 xl:overflow-y-auto xl:pr-1">
             {visibleAnnouncements.length === 0 ? (
-              <Empty text="All caught up. New announcements will show up here." />
+              <EmptyState kind="news" />
             ) : (
               <CardList
                 cards={visibleAnnouncements}
@@ -974,15 +969,9 @@ function BoardColumn({ column, count, isDropTarget, children, ...dropHandlers })
 
 // `splitAt` (board columns only): cards before this index are due this week, the rest are
 // "Later". This week's cards are never hidden behind "Show more"; only Later folds up.
-function CardList({ cards, collapseAfter, renderCard, emptyText, splitAt, listClassName = "flex flex-col gap-2" }) {
+function CardList({ cards, collapseAfter, renderCard, emptyKind, splitAt, listClassName = "flex flex-col gap-2" }) {
   const [expanded, setExpanded] = useState(false);
-  if (cards.length === 0 && emptyText) {
-    return (
-      <p className="px-1 py-6 text-center text-sm" style={{ color: MUTED }}>
-        {emptyText}
-      </p>
-    );
-  }
+  if (cards.length === 0 && emptyKind) return <EmptyState kind={emptyKind} />;
   const split = splitAt ?? 0;
   const collapsedLimit = collapseAfter ? Math.max(collapseAfter, split) : cards.length;
   const limit = expanded ? cards.length : collapsedLimit;

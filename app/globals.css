@@ -447,3 +447,8 @@ details[open] > .fold-summary .fold-chevron {
 .hero-btn { background: var(--hero-btn-bg); color: var(--hero-btn-fg); box-shadow: 0 3px 0 var(--hero-btn-edge); }
 .hero-btn:hover { background: var(--hero-btn-hover); }
 .hero-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--hero-btn-edge); }
+
+/* Empty lists (EmptyState.jsx): the confetti pieces drift a little. Reduced motion stops it. */
+@keyframes empty-confetti { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+.empty-confetti { animation: empty-confetti 3.2s ease-in-out infinite; transform-box: fill-box; }
+@media (prefers-reduced-motion: reduce) { .empty-confetti { animation: none; } }
