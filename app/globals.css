@@ -539,3 +539,17 @@ a.headsup-chip-news:hover { background: var(--purple-bg); color: var(--purple-fg
 .headsup-crunch:hover { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--amber-fg) 55%, transparent); }
 .headsup-caret { transition: transform 0.18s; }
 .headsup-crunch[aria-expanded="true"] .headsup-caret { transform: rotate(90deg); }
+/* DASH-11 Search (SearchPalette.jsx): the Ctrl+K pop-up. Matching words are marked in a soft
+   brand tint, the highlighted row (arrow keys or mouse) gets a tinted fill and outline, and small
+   key labels look like keys. Built from the theme tokens, so light and dark both work. */
+.search-mark { background: color-mix(in srgb, var(--brand) 20%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
+.search-opt { color: var(--ink); cursor: pointer; transition: background-color 0.12s, box-shadow 0.12s; }
+.search-opt[aria-selected="true"] { background: color-mix(in srgb, var(--brand) 9%, var(--surface)); box-shadow: inset 0 0 0 1.5px var(--brand-ring); }
+.search-enter { color: var(--brand-text); }
+.search-kbd {
+  display: inline-grid; place-items: center; min-width: 1.35rem; height: 1.25rem; padding: 0 0.3rem;
+  border-radius: 0.35rem; background: var(--surface); color: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--line), 0 1px 0 var(--line);
+  font-family: var(--font-sans); font-size: 10.5px; font-weight: 700; line-height: 1;
+}
+.btn .search-kbd { margin-left: 0.15rem; background: var(--surface-2); }

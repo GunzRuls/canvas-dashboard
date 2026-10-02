@@ -16,6 +16,7 @@ import QuickLook from "./QuickLook";
 import { useGradeGoal, GoalPill, GoalTick, GoalEditor } from "./GradeGoal";
 import WhatsNew from "./WhatsNew";
 import { recentlyMoved } from "@/lib/changesDiff";
+import SearchPalette, { SearchButton } from "./SearchPalette";
 import { displayCode } from "@/lib/courseNames";
 
 const INK = "var(--ink)";
@@ -150,6 +151,7 @@ export default function Dashboard({
   const [seenGradeKeys, setSeenGradeKeys] = useState(new Set());
   const [theme, setTheme] = useState(null); // "light" | "dark", read after load
   const [look, setLook] = useState(null); // the Quick look pop-up's item, see openLook
+  const [searching, setSearching] = useState(false); // the Ctrl+K search pop-up (SearchPalette.jsx)
 
   const refresh = () => startRefresh(() => router.refresh());
 
@@ -520,6 +522,7 @@ export default function Dashboard({
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2 xl:ml-auto">
+          <SearchButton onClick={() => setSearching(true)} />
           <WhatsNew whatsNew={whatsNew} now={now} courseFor={courseFor} onOpen={openChange} />
           <TopButton onClick={toggleTheme} label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
             {theme === "dark" ? "Light mode" : "Dark mode"}
@@ -778,6 +781,22 @@ export default function Dashboard({
         </div>
       </div>
 
+      <SearchPalette
+        open={searching}
+        onOpen={() => setSearching(true)}
+        onClose={() => setSearching(false)}
+        courses={courses}
+        items={items}
+        status={status}
+        announcements={announcements.filter((a) => !dismissedIds.has(a.id))}
+        dismissedIds={dismissedIds}
+        now={now}
+        colorFor={colorFor}
+        nameFor={nameFor}
+        onFilter={setFilter}
+        onLookItem={lookItem}
+        onLookAnnouncement={lookAnnouncement}
+      />
       {whatIfCourse &&<WhatIfPanel course={whatIfCourse} onClose={() => setWhatIfCourse(null)} />}
       {look && (
         <QuickLook
