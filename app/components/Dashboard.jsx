@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import WeekStrip from "./WeekStrip";
@@ -12,6 +12,7 @@ import UpdateNotice from "./UpdateNotice";
 import AccountChip from "./AccountChip";
 import NextClassCard from "./NextClassCard";
 import QuickLook from "./QuickLook";
+import { useGradeGoal, GoalPill, GoalTick, GoalEditor } from "./GradeGoal";
 import { displayCode } from "@/lib/courseNames";
 
 const INK = "var(--ink)";
@@ -853,9 +854,14 @@ function formatNumber(n) {
 // One class in the sidebar's Grades list: a small ring, the name (opens the course home), code and
 // grade, then Check in / What-if / Grades and the "N new" chip. Clicking the row anywhere that isn't
 // a link or button focuses the page on this class. New grades open inline (no pop-over), so the
-// list can scroll without cutting it off.
+// list can scroll without cutting it off. The grade goal (CLASS-6) adds a tick on the ring, a status
+// pill after the grade, and an inline goal picker (GradeGoal.jsx).
 function GradeRow({ course, active, dimmed, onSelect, onWhatIf, newGrades, onSeen }) {
   const [open, setOpen] = useState(false);
+  const [goalOpen, setGoalOpen] = useState(false);
+  const goalPillRef = useRef(null);
+  const g = useGradeGoal(course);
+  const goalPanelId = `goal-${course.id}`;
   const score = course.score;
   const hasNew = newGrades.length > 0;
   const pct = score === null ? 0 : Math.max(0, Math.min(100, Number(score)));
@@ -884,6 +890,7 @@ function GradeRow({ course, active, dimmed, onSelect, onWhatIf, newGrades, onSee
         }}
         aria-hidden="true"
       >
+        <GoalTick goal={g.goal} />
         <div className="grid h-[34px] w-[34px] place-items-center rounded-full bg-[var(--surface)]">
           <span className="font-display text-[11px] font-extrabold tracking-tight" style={{ color: INK }}>
             {score === null ? "–" : `${Math.round(score)}%`}
@@ -917,15 +924,28 @@ function GradeRow({ course, active, dimmed, onSelect, onWhatIf, newGrades, onSee
             </button>
           )}
         </div>
-        <p className="truncate text-xs font-semibold tabular-nums" style={{ color: MUTED }}>
-          {code && (
-            <>
-              <span className="c-text font-bold">{code}</span>
-              {" · "}
-            </>
-          )}
-          {score === null ? "No grade yet" : `${Number(score).toFixed(1)}%${course.grade ? ` · ${course.grade}` : ""}`}
-        </p>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <p className="min-w-0 flex-1 truncate text-xs font-semibold tabular-nums" style={{ color: MUTED }}>
+            {code && (
+              <>
+                <span className="c-text font-bold">{code}</span>
+                {" · "}
+              </>
+            )}
+            {score === null ? "No grade yet" : `${Number(score).toFixed(1)}%${course.grade ? ` · ${course.grade}` : ""}`}
+          </p>
+          <span ref={goalPillRef} className="contents">
+            <GoalPill
+              goal={g.goal}
+              status={g.status}
+              loading={g.loading}
+              open={goalOpen}
+              controls={goalPanelId}
+              courseName={course.name}
+              onToggle={() => setGoalOpen(!goalOpen)}
+            />
+          </span>
+        </div>
         <div className="mt-0.5 flex flex-wrap gap-1">
           {course.attendanceUrl && (
             <a
@@ -951,6 +971,23 @@ function GradeRow({ course, active, dimmed, onSelect, onWhatIf, newGrades, onSee
             Grades
           </a>
         </div>
+
+        {goalOpen && (
+          <GoalEditor
+            id={goalPanelId}
+            goal={g.goal}
+            status={g.status}
+            failed={g.failed}
+            error={g.error}
+            hasDropRules={g.outlook?.hasDropRules}
+            unposted={g.outlook?.unposted}
+            onSave={g.save}
+            onClose={() => {
+              setGoalOpen(false);
+              goalPillRef.current?.querySelector("button")?.focus();
+            }}
+          />
+        )}
 
         {hasNew && open && (
           <div className="pointer-events-auto mt-1.5 rounded-xl bg-[var(--surface)] p-2.5 shadow-[0_0_0_1px_var(--line)]" role="group" aria-label="New grades">
