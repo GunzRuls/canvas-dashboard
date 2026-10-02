@@ -528,3 +528,14 @@ details[open] > .fold-summary .fold-chevron {
 .whatsnew-moved { color: var(--amber-fg); }
 .whatsnew-graded { color: var(--green-fg); }
 .whatsnew-removed { color: var(--muted); }
+/* DASH-13/14 Heads up (HeadsUpCard.jsx): small links under an exam (announcements purple like the
+   ones on board cards, review sessions and practice exams neutral), and the amber "Heavy week
+   ahead" line that opens its list. Colors come from the theme tokens, so dark mode follows. */
+.headsup-chip { background: var(--chip); color: var(--ink-soft); transition: background-color 0.15s, color 0.15s; }
+a.headsup-chip:hover { background: var(--surface-3); color: var(--ink); }
+.headsup-chip-news { background: var(--purple-bg); color: var(--purple-fg); }
+a.headsup-chip-news:hover { background: var(--purple-bg); color: var(--purple-fg); box-shadow: inset 0 0 0 1px currentColor; }
+.headsup-crunch { background: var(--amber-bg); color: var(--amber-fg); transition: box-shadow 0.15s; }
+.headsup-crunch:hover { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--amber-fg) 55%, transparent); }
+.headsup-caret { transition: transform 0.18s; }
+.headsup-crunch[aria-expanded="true"] .headsup-caret { transform: rotate(90deg); }

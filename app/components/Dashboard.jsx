@@ -11,6 +11,7 @@ import EmptyState from "./EmptyState";
 import UpdateNotice from "./UpdateNotice";
 import AccountChip from "./AccountChip";
 import NextClassCard from "./NextClassCard";
+import HeadsUpCard from "./HeadsUpCard";
 import QuickLook from "./QuickLook";
 import { useGradeGoal, GoalPill, GoalTick, GoalEditor } from "./GradeGoal";
 import WhatsNew from "./WhatsNew";
@@ -559,6 +560,20 @@ export default function Dashboard({
               onLookItem={lookItem}
               onLookAnnouncement={lookAnnouncement}
               onAddTimes={() => setManaging(true)}
+            />
+          </div>
+
+          {/* Heads up (DASH-13/14): exams coming up and a heavy-week warning. */}
+          <div className="flex-none">
+            <HeadsUpCard
+              now={now}
+              courses={courses}
+              items={items}
+              status={status}
+              announcements={announcements.filter((a) => !dismissedIds.has(a.id))}
+              events={events}
+              onLookItem={lookItem}
+              onLookAnnouncement={lookAnnouncement}
             />
           </div>
 
