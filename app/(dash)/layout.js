@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import Dashboard from "./components/Dashboard";
+import Dashboard from "../components/Dashboard";
+import ReloadLink from "../components/ReloadLink";
 import { loadDashboard } from "@/lib/loadDashboard";
 import { calendarEnabled } from "@/lib/calendar";
 import { digestEnabled } from "@/lib/digest";
@@ -24,9 +25,14 @@ const PROBLEMS = {
   },
 };
 
-// Both tabs (Today at "/", This term at "/term") load the same data the same way and draw the
-// same shell (Dashboard.jsx); `view` picks which tab's panels show.
-export default async function DashboardPage({ view }) {
+export const dynamic = "force-dynamic";
+
+// Both tabs (Today at "/", This term at "/term") share this layout: it loads the data once and
+// draws the shell (Dashboard.jsx), and the two pages are empty. Dashboard reads the tab from the
+// URL and switches tabs in the browser (history.pushState), so going between them never asks the
+// server again or shows the loading screen. A layout also stays put on router.refresh(), so the
+// 15-minute refresh keeps your tab, filters and open rows.
+export default async function DashboardLayout({ children }) {
   // First launch: nothing to show until Canvas is connected.
   if (!isConfigured()) redirect("/setup");
 
@@ -39,9 +45,7 @@ export default async function DashboardPage({ view }) {
       body: error.message,
       action: { href: "/", label: "Try again" },
     };
-    // "Try again" reloads the tab you were on.
-    const here = view === "term" ? "/term" : "/";
-    return <CanvasProblem {...problem} action={{ ...problem.action, href: problem.action.href === "/" ? here : problem.action.href }} />;
+    return <CanvasProblem {...problem} />;
   }
 
   return (
@@ -60,8 +64,9 @@ export default async function DashboardPage({ view }) {
       account={data.account}
       whatsNew={data.whatsNew}
       loadedAt={Date.now()}
-      view={view}
-    />
+    >
+      {children}
+    </Dashboard>
   );
 }
 
@@ -76,12 +81,14 @@ function CanvasProblem({ title, body, action }) {
           {body}
         </p>
         <div className="mt-5 flex flex-wrap items-center gap-2">
-          <a
-            href={action.href}
-            className="btn btn-primary px-4 py-2 text-sm"
-          >
-            {action.label}
-          </a>
+          {action.href === "/" ? (
+            // "Try again" reloads the tab you were on (Today or This term).
+            <ReloadLink className="btn btn-primary px-4 py-2 text-sm">{action.label}</ReloadLink>
+          ) : (
+            <a href={action.href} className="btn btn-primary px-4 py-2 text-sm">
+              {action.label}
+            </a>
+          )}
           {action.href !== "/setup" && !action.href.startsWith("/setup?") && (
             <a
               href="/setup"

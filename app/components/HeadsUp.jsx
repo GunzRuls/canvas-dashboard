@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { ViewLink } from "./ViewTabs";
 import { countdown } from "@/lib/exams";
 import { dayRange, weekStart, HEAVY_RATIO, MIN_ITEMS } from "@/lib/crunch";
 import { displayCode } from "@/lib/courseNames";
@@ -142,12 +142,12 @@ export default function HeadsUp({ ready, exams, crunch, courses, now, onLookItem
         </p>
       )}
 
-      <Link href="/term" className="text-link flex flex-none items-center gap-1.5 border-t border-[var(--chip)] px-3.5 pb-3 pt-2.5 text-[13px] font-bold" style={{ color: "var(--brand-text)" }}>
+      <ViewLink view="term" className="text-link flex flex-none items-center gap-1.5 border-t border-[var(--chip)] px-3.5 pb-3 pt-2.5 text-[13px] font-bold" style={{ color: "var(--brand-text)" }}>
         Plan ahead in This term
         <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[13px] w-[13px]" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M5 12h14M13 6l6 6-6 6" />
         </svg>
-      </Link>
+      </ViewLink>
     </>
   );
 }

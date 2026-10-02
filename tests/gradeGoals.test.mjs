@@ -36,7 +36,7 @@ test("need more than your current grade: amber 'Avg X% on rest'", () => {
   assert.equal(s.tone, "warn");
   assert.equal(s.label, "Avg 95% on rest");
   close(s.needed, 95, "needed");
-  assert.match(s.detail, /^To finish at 90%, you need to average 95% on all the work still left in this class/);
+  assert.match(s.detail, /^To finish with 90%, you'd need about 95% on the rest\. That's the average on everything not graded yet/);
 });
 
 test("the shown percent rounds up, never down", () => {
@@ -146,12 +146,12 @@ test("the wording names the goal and its letter from the class's scale", () => {
   // (85 - 42.5) / 50 = 85% <= 85%: on track
   assert.equal(
     goalStatus(o, 85).detail,
-    "You're averaging enough: keep scoring about 85% on what's left to finish at 85% (B)."
+    "To finish with 85% (B), you'd need about 85% on the rest, and you're already averaging that."
   );
   // (86.3 - 42.5) / 50 = 87.6% -> 88%; 86.3 is a B on this scale
   assert.equal(
     goalStatus(o, 86.3).detail,
-    "To finish at 86.3% (B), you need to average 88% on all the work still left in this class (every assignment, quiz and exam not graded yet), weighted the way Canvas weighs it."
+    "To finish with 86.3% (B), you'd need about 88% on the rest. That's the average on everything not graded yet (assignments, quizzes and exams), weighted the way Canvas weighs it."
   );
   // best case 92.5%
   assert.equal(goalStatus(o, 95).detail, "Even 100% on everything left ends at 92.5%, below your 95% (A) goal.");

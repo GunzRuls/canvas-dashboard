@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import WeekStrip from "./WeekStrip";
 import QuickAdd from "./QuickAdd";
@@ -13,6 +13,7 @@ import AccountChip from "./AccountChip";
 import NextClassCard from "./NextClassCard";
 import IncomingPanel from "./IncomingPanel";
 import TermView from "./TermView";
+import ViewTabs, { viewForPath } from "./ViewTabs";
 import { useHeadsUp } from "./useHeadsUp";
 import QuickLook from "./QuickLook";
 import { useGradeGoal, GoalPill, GoalTick, GoalEditor } from "./GradeGoal";
@@ -130,9 +131,22 @@ export default function Dashboard({
   account = null,
   whatsNew = null,
   loadedAt,
-  view = "today", // "today" (app/page.js) or "term" (app/term/page.js); both share this shell
+  children, // the (empty) page under app/(dash)/layout.js
 }) {
   const router = useRouter();
+  // Which tab shows, from the URL: "/" is Today, "/term" is This term (see ViewTabs.jsx). Under the
+  // Settings pop-up the URL is /setup, so the tab you were on stays.
+  const pathname = usePathname();
+  const [view, setView] = useState(() => viewForPath(pathname) || "today");
+  const pathView = viewForPath(pathname);
+  if (pathView && pathView !== view) setView(pathView);
+  // This term mounts the first time you open it and then stays (hidden on Today), so switching
+  // back and forth doesn't fetch its class breakdowns again.
+  const [termOpened, setTermOpened] = useState(view === "term");
+  if (view === "term" && !termOpened) setTermOpened(true);
+  const todayRef = useRef(null);
+  const termRef = useRef(null);
+  const shownView = useRef(view);
   const [isRefreshing, startRefresh] = useTransition();
   const [now, setNow] = useState(null);
   const [filter, setFilter] = useState(null);
@@ -160,6 +174,23 @@ export default function Dashboard({
   const [searchReturn, setSearchReturn] = useState(null);
 
   const refresh = () => startRefresh(() => router.refresh());
+
+  // Switching tabs: the new tab's area fades in and rises a few pixels (the top bar stays still),
+  // and the browser tab's title follows. Skipped for reduced motion.
+  useEffect(() => {
+    if (shownView.current === view) return;
+    shownView.current = view;
+    document.title = view === "term" ? "This term · School Dashboard" : "School Dashboard";
+    const el = (view === "term" ? termRef : todayRef).current;
+    if (!el?.animate || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    el.animate(
+      [
+        { opacity: 0, transform: "translateY(5px)" },
+        { opacity: 1, transform: "none" },
+      ],
+      { duration: 180, easing: "cubic-bezier(0.2, 0.7, 0.3, 1)" }
+    );
+  }, [view]);
 
   // Keep Canvas data fresh without clicking Refresh: every 15 minutes while open, and when you
   // come back to the window after 3 or more minutes away.
@@ -539,14 +570,7 @@ export default function Dashboard({
         <h1 className="font-display whitespace-nowrap text-2xl font-extrabold tracking-tight xl:text-[26px]" style={{ color: INK }}>
           {today}
         </h1>
-        <nav aria-label="Views" className="panel flex h-[38px] flex-none gap-0.5 rounded-full p-[3px]">
-          <Link href="/" className="view-tab" aria-current={view === "today" ? "page" : undefined}>
-            Today
-          </Link>
-          <Link href="/term" className="view-tab" aria-current={view === "term" ? "page" : undefined}>
-            This term
-          </Link>
-        </nav>
+        <ViewTabs view={view} />
         <div className="panel flex min-h-[34px] flex-wrap items-center gap-x-1 rounded-full px-2.5 py-0.5">
           <Stat value={dueThisWeek} label="due this week" color="var(--blue-fg)" />
           <Stat value={overdue} label="overdue" color={overdue ? "var(--red-fg)" : "var(--line-2)"} />
@@ -583,19 +607,21 @@ export default function Dashboard({
         </div>
       </header>
 
-      {view === "term" ? (
-        <TermView
-          now={now}
-          courses={courses}
-          items={items}
-          status={status}
-          headsUp={headsUp}
-          onLookItem={lookItem}
-          onLookAnnouncement={lookAnnouncement}
-          onWhatIf={setWhatIfCourse}
-        />
-      ) : (
-      <div className="flex flex-col gap-4 xl:min-h-[520px] xl:flex-1 xl:flex-row">
+      {termOpened && (
+        <div ref={termRef} className={view === "term" ? "flex flex-col xl:min-h-0 xl:flex-1" : "hidden"}>
+          <TermView
+            now={now}
+            courses={courses}
+            items={items}
+            status={status}
+            headsUp={headsUp}
+            onLookItem={lookItem}
+            onLookAnnouncement={lookAnnouncement}
+            onWhatIf={setWhatIfCourse}
+          />
+        </div>
+      )}
+      <div ref={todayRef} className={view === "today" ? "flex flex-col gap-4 xl:min-h-[520px] xl:flex-1 xl:flex-row" : "hidden"}>
         {/* Sidebar: Next class, then every class's grade */}
         <aside
           className="flex flex-col gap-4 xl:min-h-0 xl:w-[288px] xl:flex-none xl:gap-3.5 min-[90rem]:w-[320px]"
@@ -811,7 +837,7 @@ export default function Dashboard({
       </div>
         </div>
       </div>
-      )}
+      {children}
       <SearchPalette
         open={searching}
         onOpen={openSearch}

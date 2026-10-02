@@ -4,7 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { weekStart, dayRange } from "@/lib/crunch";
 import { displayCode } from "@/lib/courseNames";
 import { computeGrade, groupTotals, averageNeeded } from "@/lib/gradeMath";
-import { letterScale, letterFor } from "@/lib/gradeGoals";
+import { letterScale, letterFor, goalWords } from "@/lib/gradeGoals";
 import { DateTile, countdownStyle, examLink, examTime, Related } from "./HeadsUp";
 import { useGradeGoal, GoalPill, GoalTick, GoalEditor } from "./GradeGoal";
 
@@ -655,14 +655,16 @@ function QuickWhatIf({ course, breakdown, exam, goal, now, onWhatIf }) {
   const result = target && v !== null && Number.isFinite(v) ? computeGrade(breakdown, whatIf) : null;
   const rest = goal !== null && target && v !== null && Number.isFinite(v) ? averageNeeded(breakdown, whatIf, goal) : null;
 
+  // The goal is the final grade (CLASS-8): "To finish with 90% (A-), you'd need about 95% on the rest."
+  const finish = goal === null ? "" : `To finish with ${goalWords(goal, letterScale(breakdown.scheme))}`;
   let goalLine;
   if (goal === null) goalLine = "Set a goal to see what the rest of the class needs.";
-  else if (!rest) goalLine = `Goal ${goal}%: type a score to see what the rest needs.`;
-  else if (rest.kind === "needed") goalLine = `Goal ${goal}%: you'd still need about ${Math.ceil(rest.percent - 1e-9)}% on the rest.`;
-  else if (rest.kind === "locked") goalLine = `Goal ${goal}%: you'd be there even with zeros on the rest.`;
-  else if (rest.kind === "impossible") goalLine = `Goal ${goal}%: out of reach even with 100% on the rest.`;
-  else if (rest.kind === "none") goalLine = `Goal ${goal}%: nothing else is left to grade.`;
-  else goalLine = `Goal ${goal}%: not enough graded work yet to tell.`;
+  else if (!rest) goalLine = `${finish}: type a score to see what the rest needs.`;
+  else if (rest.kind === "needed") goalLine = `${finish}, you'd need about ${Math.ceil(rest.percent - 1e-9)}% on the rest.`;
+  else if (rest.kind === "locked") goalLine = `${finish}, you'd be there even with zeros on the rest.`;
+  else if (rest.kind === "impossible") goalLine = `${finish}: out of reach even with 100% on the rest.`;
+  else if (rest.kind === "none") goalLine = `${finish}: nothing else is left to grade.`;
+  else goalLine = `${finish}: not enough graded work yet to tell.`;
 
   const due = target?.dueAt ? new Date(target.dueAt) : null;
 

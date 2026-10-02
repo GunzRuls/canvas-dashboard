@@ -158,7 +158,7 @@ export function GoalEditor({ id, goal, status, failed, error, hasDropRules, unpo
       tabIndex={-1}
       id={id}
       role="group"
-      aria-label="Grade goal"
+      aria-label="Grade goal: the final grade you want in this class"
       onKeyDown={(e) => {
         if (e.key === "Escape") {
           e.stopPropagation();
@@ -168,8 +168,9 @@ export function GoalEditor({ id, goal, status, failed, error, hasDropRules, unpo
       className="pointer-events-auto mt-1.5 rounded-xl bg-[var(--surface)] p-2.5 shadow-[0_0_0_1px_var(--line)] outline-none"
     >
       <div className="mb-1.5 flex items-center justify-between gap-2">
+        {/* The goal is the final grade (CLASS-8), not a score on the work that's left. */}
         <span className="text-xs font-extrabold" style={{ color: "var(--ink)" }}>
-          Grade goal
+          Finish this class with…
         </span>
         <button onClick={() => onClose()} className="text-link text-[11px] font-bold" style={{ color: "var(--muted)" }}>
           Close
@@ -184,7 +185,7 @@ export function GoalEditor({ id, goal, status, failed, error, hasDropRules, unpo
             onClick={() => pick(p.value)}
             aria-pressed={goal === p.value}
             className="goal-preset flex-1 rounded-md px-1 py-1 text-[11px] font-bold disabled:opacity-50"
-            title={`Aim for ${p.label} (${p.value}%)`}
+            title={`Finish the class with ${p.label} (${p.value}%)`}
           >
             {p.label} <span className="font-semibold opacity-70">{p.value}</span>
           </button>
@@ -192,7 +193,7 @@ export function GoalEditor({ id, goal, status, failed, error, hasDropRules, unpo
       </div>
       <form onSubmit={submit} className="mt-1.5 flex items-center gap-1.5">
         <label htmlFor={inputId} className="sr-only">
-          Custom goal in percent
+          Final grade you want, in percent
         </label>
         <input
           id={inputId}
@@ -201,7 +202,7 @@ export function GoalEditor({ id, goal, status, failed, error, hasDropRules, unpo
           min="1"
           max="100"
           step="any"
-          placeholder="Custom %"
+          placeholder="Final grade %"
           value={custom}
           onChange={(e) => {
             setCustom(e.target.value);
