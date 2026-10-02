@@ -13,6 +13,8 @@ import AccountChip from "./AccountChip";
 import NextClassCard from "./NextClassCard";
 import QuickLook from "./QuickLook";
 import { useGradeGoal, GoalPill, GoalTick, GoalEditor } from "./GradeGoal";
+import WhatsNew from "./WhatsNew";
+import { recentlyMoved } from "@/lib/changesDiff";
 import { displayCode } from "@/lib/courseNames";
 
 const INK = "var(--ink)";
@@ -122,6 +124,7 @@ export default function Dashboard({
   newGrades = [],
   sessions = [],
   account = null,
+  whatsNew = null,
   loadedAt,
 }) {
   const router = useRouter();
@@ -472,6 +475,21 @@ export default function Dashboard({
     openLook(e, { kind: "announcement", type: "announcement", courseId: a.courseId, id: a.id, title: a.title, url: a.url, announcement: a });
   }
 
+  // "What's new" (DASH-10): a row opens like a card title click; anything Quick look can't
+  // show is left alone, so its link opens in the pop-up window.
+  function openChange(e, c) {
+    if (c.type === "announcement") {
+      const a = announcements.find((x) => x.id === c.plannableId);
+      if (a) lookAnnouncement(e, a);
+      return;
+    }
+    const item = items.find((i) => i.key === c.key);
+    if (item) lookItem(e, item);
+  }
+  const courseFor = (courseId) =>
+    courseById[courseId] && { name: nameFor(courseId), code: codeFor(courseId), color: colorFor(courseId) };
+  const movedFrom = now ? recentlyMoved(whatsNew?.changes || [], now) : {};
+
   const today = now
     ? new Date(now).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })
     : "\u00A0";
@@ -501,6 +519,7 @@ export default function Dashboard({
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2 xl:ml-auto">
+          <WhatsNew whatsNew={whatsNew} now={now} courseFor={courseFor} onOpen={openChange} />
           <TopButton onClick={toggleTheme} label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
             {theme === "dark" ? "Light mode" : "Dark mode"}
           </TopButton>
@@ -684,6 +703,7 @@ export default function Dashboard({
                         onMove={(to) => moveItem(item, to)}
                         onDelete={() => deleteNote(item)}
                         newGrade={gradeForItem(item)}
+                        movedFrom={movedFrom[item.key]}
                       />
                     )}
                     emptyKind={col.id}
@@ -1156,6 +1176,7 @@ function TaskCard({
   onMove,
   onDelete,
   newGrade,
+  movedFrom,
 }) {
   const isNote = item.type === "planner_note";
   const done = column === "done";
@@ -1245,6 +1266,11 @@ function TaskCard({
         {done && syncing && (
           <span className="mr-0.5 text-xs" style={{ color: MUTED }}>
             Saving…
+          </span>
+        )}
+        {movedFrom && !done && (
+          <span title={`Was due ${new Date(movedFrom).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`}>
+            <Badge text="Moved" bg="var(--amber-bg)" fg="var(--amber-fg)" />
           </span>
         )}
         {badges.map((b) => (

@@ -32,7 +32,7 @@ export default async function Home() {
 
   let data;
   try {
-    data = await loadDashboard();
+    data = await loadDashboard({ withChanges: true });
   } catch (error) {
     const problem = PROBLEMS[error.kind] || {
       title: "Canvas didn't load",
@@ -56,6 +56,7 @@ export default async function Home() {
       newGrades={data.newGrades}
       sessions={data.sessions}
       account={data.account}
+      whatsNew={data.whatsNew}
       loadedAt={Date.now()}
     />
   );
