@@ -20,7 +20,7 @@ function onDay(e, key) {
   return e.end > e.start ? key >= e.start && key < e.end : key === e.start;
 }
 
-// The next 7 days as one slim row (Layout A): each day shows its first due item (or event) and
+// The next 7 days as one slim row (Today tab): each day shows its first due item (or event) and
 // "+N" for the rest. Hovering a day (or tabbing into it) opens a small list of everything that
 // day. Clicking an item opens Quick look (onLook), like the board. Narrow windows wrap the days
 // onto 2 or 4 columns.

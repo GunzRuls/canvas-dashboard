@@ -2,7 +2,7 @@
 // made-up grades below. Run with: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { cleanGoal, goalOutlook, goalStatus, letterScale, letterFor } from "../lib/gradeGoals.js";
+import { GOAL_PRESETS, cleanGoal, goalOutlook, goalPresets, goalStatus, letterScale, letterFor } from "../lib/gradeGoals.js";
 
 const graded = (id, score, points) => ({ id, score, points, graded: true, excused: false });
 const ungraded = (id, points) => ({ id, score: null, points, graded: false, excused: false });
@@ -170,4 +170,27 @@ test("letter scale: fractions or percents, highest first, junk skipped", () => {
   assert.deepEqual(letterScale([["A", 0.94], ["B-", 0.8], [null, 0.5], ["X"]]), [{ name: "A", min: 94 }, { name: "B-", min: 80 }]);
   // The owner's example: 80% is a B- on Florida Poly's usual scale.
   assert.equal(letterFor(80, letterScale([["B", 0.84], ["B-", 0.8], ["C+", 0.77]])), "B-");
+});
+
+test("goal presets follow the class's letter scale", () => {
+  // Florida Poly's usual scale: 90 is an A-, so the A preset is 94.
+  const fpu = letterScale([["A", 0.94], ["A-", 0.9], ["B+", 0.87], ["B", 0.84], ["B-", 0.8], ["C+", 0.77], ["C", 0.74], ["C-", 0.7], ["D", 0.6], ["F", 0]]);
+  assert.deepEqual(goalPresets(fpu), [
+    { label: "A", value: 94 },
+    { label: "B+", value: 87 },
+    { label: "B", value: 84 },
+    { label: "C", value: 74 },
+  ]);
+  // Every preset's label is the letter its own value earns, so the pill text can't disagree.
+  for (const p of goalPresets(fpu)) assert.equal(letterFor(p.value, fpu), p.label);
+  // A plain A/B/C/D/F scale has no B+: the nearest cutoff to 87 is A (90), already used, so it's skipped.
+  const plain = letterScale([["A", 0.9], ["B", 0.8], ["C", 0.7], ["D", 0.6], ["F", 0]]);
+  assert.deepEqual(goalPresets(plain), [
+    { label: "A", value: 90 },
+    { label: "B", value: 80 },
+    { label: "C", value: 70 },
+  ]);
+  // No scale: the fixed presets.
+  assert.deepEqual(goalPresets([]), GOAL_PRESETS);
+  assert.deepEqual(goalPresets(undefined), GOAL_PRESETS);
 });

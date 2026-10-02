@@ -4,7 +4,7 @@
 // pill, the tick mark on the ring, and the small inline goal picker. The math is in
 // lib/gradeGoals.js (tested); this file only fetches, saves and draws.
 import { useEffect, useId, useRef, useState } from "react";
-import { GOAL_PRESETS, cleanGoal, goalStatus } from "@/lib/gradeGoals";
+import { cleanGoal, goalPresets, goalStatus } from "@/lib/gradeGoals";
 
 const TONES = {
   good: { background: "var(--green-bg)", color: "var(--green-fg)" },
@@ -14,17 +14,19 @@ const TONES = {
 };
 
 // The goal for one class: saved through POST /api/settings (only this class's goal changes),
-// and the outlook (what's left) loaded from /api/goals only when a goal is set.
-export function useGradeGoal(course) {
+// and the outlook (what's left) loaded from /api/goals only when a goal is set or `want` is true
+// (the picker is open: its presets need the class's letter scale).
+export function useGradeGoal(course, want = false) {
   const [goal, setGoal] = useState(course.goal ?? null);
   const [outlook, setOutlook] = useState(null);
   const [failed, setFailed] = useState(false);
   const [error, setError] = useState("");
   const hasGoal = goal !== null;
+  const needed = hasGoal || want;
 
   // Reload when a goal is first set or the grade changes (a new grade came in).
   useEffect(() => {
-    if (!hasGoal) return;
+    if (!needed) return;
     let stop = false;
     fetch(`/api/goals?courseId=${encodeURIComponent(course.id)}`)
       .then((r) => r.json())
@@ -37,7 +39,7 @@ export function useGradeGoal(course) {
     return () => {
       stop = true;
     };
-  }, [hasGoal, course.id, course.score]);
+  }, [needed, course.id, course.score]);
 
   async function save(value) {
     const next = cleanGoal(value);
@@ -59,11 +61,21 @@ export function useGradeGoal(course) {
     }
   }
 
-  return { goal, outlook, status: goalStatus(outlook, goal), loading: hasGoal && !outlook && !failed, failed, error, save };
+  return {
+    goal,
+    outlook,
+    status: goalStatus(outlook, goal),
+    loading: hasGoal && !outlook && !failed,
+    // The picker waits for the letter scale so a preset's letter never changes under the mouse.
+    scaleReady: Boolean(outlook) || failed,
+    failed,
+    error,
+    save,
+  };
 }
 
-// The pill next to the grade: "Set goal" with no goal, the status once loaded.
-export function GoalPill({ goal, status, loading, open, onToggle, controls, courseName }) {
+// The pill next to the grade: "+ Goal" with no goal ("+ Set a goal" when `long`), the status once loaded.
+export function GoalPill({ goal, status, loading, open, onToggle, controls, courseName, long = false }) {
   const base = "pointer-events-auto goal-pill shrink-0 rounded-md px-1.5 py-px text-[11px] font-bold";
   if (goal === null) {
     return (
@@ -75,7 +87,7 @@ export function GoalPill({ goal, status, loading, open, onToggle, controls, cour
         title="Set a grade goal for this class"
         aria-label={`Set a grade goal for ${courseName}`}
       >
-        + Goal
+        {long ? "+ Set a goal" : "+ Goal"}
       </button>
     );
   }
@@ -110,15 +122,24 @@ export function GoalTick({ goal }) {
 
 // The goal picker, opened inline under the row (like the new-grades list) so the scrolling list
 // never cuts it off. Escape or Close puts focus back on the pill.
-export function GoalEditor({ id, goal, status, failed, error, hasDropRules, unposted, onSave, onClose }) {
-  const [custom, setCustom] = useState(goal !== null && !GOAL_PRESETS.some((p) => p.value === goal) ? String(goal) : "");
+// Presets come from the class's letter scale (goalPresets), so "A 94" never shows as "(A-)" later.
+export function GoalEditor({ id, goal, status, failed, error, hasDropRules, unposted, scale, scaleReady = true, onSave, onClose }) {
+  const presets = goalPresets(scale);
+  const [custom, setCustom] = useState(goal !== null && !presets.some((p) => p.value === goal) ? String(goal) : "");
   const [bad, setBad] = useState(false);
   const firstRef = useRef(null);
+  const boxRef = useRef(null);
   const inputId = useId();
 
+  // Focus starts on the box, then moves to the first preset once the presets can be clicked
+  // (unless you've already moved on to something inside, like the Custom box).
   useEffect(() => {
-    firstRef.current?.focus();
-  }, []);
+    const box = boxRef.current;
+    if (!box) return;
+    const active = document.activeElement;
+    if (!scaleReady) box.focus();
+    else if (active === box || !box.contains(active)) firstRef.current?.focus();
+  }, [scaleReady]);
 
   async function pick(value) {
     if (await onSave(value)) onClose();
@@ -133,6 +154,8 @@ export function GoalEditor({ id, goal, status, failed, error, hasDropRules, unpo
 
   return (
     <div
+      ref={boxRef}
+      tabIndex={-1}
       id={id}
       role="group"
       aria-label="Grade goal"
@@ -142,7 +165,7 @@ export function GoalEditor({ id, goal, status, failed, error, hasDropRules, unpo
           onClose();
         }
       }}
-      className="pointer-events-auto mt-1.5 rounded-xl bg-[var(--surface)] p-2.5 shadow-[0_0_0_1px_var(--line)]"
+      className="pointer-events-auto mt-1.5 rounded-xl bg-[var(--surface)] p-2.5 shadow-[0_0_0_1px_var(--line)] outline-none"
     >
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <span className="text-xs font-extrabold" style={{ color: "var(--ink)" }}>
@@ -153,13 +176,14 @@ export function GoalEditor({ id, goal, status, failed, error, hasDropRules, unpo
         </button>
       </div>
       <div className="flex gap-1">
-        {GOAL_PRESETS.map((p, i) => (
+        {presets.map((p, i) => (
           <button
             key={p.label}
             ref={i === 0 ? firstRef : undefined}
+            disabled={!scaleReady}
             onClick={() => pick(p.value)}
             aria-pressed={goal === p.value}
-            className="goal-preset flex-1 rounded-md px-1 py-1 text-[11px] font-bold"
+            className="goal-preset flex-1 rounded-md px-1 py-1 text-[11px] font-bold disabled:opacity-50"
             title={`Aim for ${p.label} (${p.value}%)`}
           >
             {p.label} <span className="font-semibold opacity-70">{p.value}</span>

@@ -26,6 +26,7 @@
   --brand: #3355FF; --brand-hover: #4466FF; --brand-press: #2139C9;
   --brand-tint: #E6EBFF; --brand-text: #2A45D6; --brand-ring: #D6DEFF;
   --glass: rgba(255, 255, 255, 0.6); --switch-on: #22A06B;
+  --heavy: #FFF8E6; --amber-line: #FFB020; --today: #F7F9FF; --menu-shadow: rgba(27, 26, 46, 0.18);
   --red-bg: #FDE8E8;    --red-fg: #B42328;
   --amber-bg: #FFF3D6;  --amber-fg: #8A5A00;
   --blue-bg: #E6EBFF;   --blue-fg: #2A45D6;
@@ -59,6 +60,7 @@
     --brand: #5B78FF; --brand-hover: #6F89FF; --brand-press: #2E48D6;
     --brand-tint: #232B55; --brand-text: #A9B8FF; --brand-ring: #2E3A70;
     --glass: rgba(255, 255, 255, 0.06); --switch-on: #2FBF80;
+    --heavy: #2A2417; --amber-line: #C98A12; --today: #1F2440; --menu-shadow: rgba(0, 0, 0, 0.55);
     --red-bg: #3A1718;    --red-fg: #FF9C9F;
     --amber-bg: #3A2E10;  --amber-fg: #FFD37A;
     --blue-bg: #232B55;   --blue-fg: #A9B8FF;
@@ -91,6 +93,7 @@
   --brand: #5B78FF; --brand-hover: #6F89FF; --brand-press: #2E48D6;
   --brand-tint: #232B55; --brand-text: #A9B8FF; --brand-ring: #2E3A70;
   --glass: rgba(255, 255, 255, 0.06); --switch-on: #2FBF80;
+  --heavy: #2A2417; --amber-line: #C98A12; --today: #1F2440; --menu-shadow: rgba(0, 0, 0, 0.55);
   --red-bg: #3A1718;    --red-fg: #FF9C9F;
   --amber-bg: #3A2E10;  --amber-fg: #FFD37A;
   --blue-bg: #232B55;   --blue-fg: #A9B8FF;
@@ -453,7 +456,7 @@ details[open] > .fold-summary .fold-chevron {
 .empty-confetti { animation: empty-confetti 3.2s ease-in-out infinite; transform-box: fill-box; }
 @media (prefers-reduced-motion: reduce) { .empty-confetti { animation: none; } }
 
-/* Layout A's slim 7-day strip (WeekStrip.jsx): a day lights up on hover, and after a short pause
+/* Today's slim 7-day strip (WeekStrip.jsx): a day lights up on hover, and after a short pause
    its full list drops down under it (also while a link inside has keyboard focus). The pause keeps
    the lists from flashing open while the mouse just passes over the strip. */
 .week-day { transition: background-color 0.15s; }
@@ -528,17 +531,12 @@ details[open] > .fold-summary .fold-chevron {
 .whatsnew-moved { color: var(--amber-fg); }
 .whatsnew-graded { color: var(--green-fg); }
 .whatsnew-removed { color: var(--muted); }
-/* DASH-13/14 Heads up (HeadsUpCard.jsx): small links under an exam (announcements purple like the
-   ones on board cards, review sessions and practice exams neutral), and the amber "Heavy week
-   ahead" line that opens its list. Colors come from the theme tokens, so dark mode follows. */
+/* DASH-13/14 Heads up (HeadsUp.jsx): small links under an exam (announcements purple like the
+   ones on board cards, practice exams neutral). Colors come from the theme tokens, so dark mode follows. */
 .headsup-chip { background: var(--chip); color: var(--ink-soft); transition: background-color 0.15s, color 0.15s; }
 a.headsup-chip:hover { background: var(--surface-3); color: var(--ink); }
 .headsup-chip-news { background: var(--purple-bg); color: var(--purple-fg); }
 a.headsup-chip-news:hover { background: var(--purple-bg); color: var(--purple-fg); box-shadow: inset 0 0 0 1px currentColor; }
-.headsup-crunch { background: var(--amber-bg); color: var(--amber-fg); transition: box-shadow 0.15s; }
-.headsup-crunch:hover { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--amber-fg) 55%, transparent); }
-.headsup-caret { transition: transform 0.18s; }
-.headsup-crunch[aria-expanded="true"] .headsup-caret { transform: rotate(90deg); }
 /* DASH-11 Search (SearchPalette.jsx): the Ctrl+K pop-up. Matching words are marked in a soft
    brand tint, the highlighted row (arrow keys or mouse) gets a tinted fill and outline, and small
    key labels look like keys. Built from the theme tokens, so light and dark both work. */
@@ -555,3 +553,72 @@ a.headsup-chip-news:hover { background: var(--purple-bg); color: var(--purple-fg
 .btn .search-kbd { margin-left: 0.15rem; background: var(--surface-2); }
 /* The top bar button drops its Ctrl K hint below 1600px so the bar stays one row. */
 @media (max-width: 99.99rem) { .btn .search-kbd { display: none; } }
+
+/* DASH-17 Top bar: the Today | This term tabs (the open one is filled in ink), and the account
+   menu (Email summary, the Dark mode switch, Canvas profile, Change account). */
+.view-tab { display: inline-flex; align-items: center; height: 32px; padding: 0 14px; border-radius: 9999px; font-size: 14px; font-weight: 700; color: var(--ink-soft); white-space: nowrap; transition: background-color 0.15s, color 0.15s; }
+.view-tab:hover { background: var(--hover); color: var(--ink); }
+.view-tab[aria-current="page"] { background: var(--ink); color: var(--bg); }
+.account-open { background: var(--hover); box-shadow: inset 0 0 0 1.5px var(--line-2), 0 3px 0 var(--line-2); }
+.account-menu { border-radius: 1rem; box-shadow: 0 0 0 1px var(--line), 0 18px 40px var(--menu-shadow); }
+.menu-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; height: 36px; padding: 0 10px; border-radius: 10px;
+  font-size: 14px; font-weight: 600; color: var(--ink); text-align: left; cursor: pointer; transition: background-color 0.15s;
+}
+.menu-item:hover:not(:disabled) { background: var(--surface-2); }
+.menu-item:disabled { opacity: 0.55; cursor: progress; }
+.menu-switch { position: relative; width: 32px; height: 18px; flex-shrink: 0; border-radius: 9999px; background: var(--line-2); transition: background-color 0.15s; }
+.menu-knob { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 9999px; background: #FFFFFF; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); transition: transform 0.18s cubic-bezier(0.3, 1.4, 0.5, 1); }
+.menu-item[aria-checked="true"] .menu-switch { background: var(--brand); }
+.menu-item[aria-checked="true"] .menu-knob { transform: translateX(14px); }
+
+/* DASH-15 Incoming: the Heads up | News | Feedback switch. The picked one is a white pill with a
+   brand count; Feedback is dimmed until it exists. */
+.seg {
+  flex: 1 1 auto; min-width: 0; height: 32px; border-radius: 9999px; display: inline-flex; align-items: center; justify-content: center;
+  gap: 6px; padding: 0 10px; font-size: 13px; font-weight: 700; white-space: nowrap; color: var(--ink-soft); cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.seg:hover:not([aria-disabled="true"]):not([aria-selected="true"]) { color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--line-2); }
+.seg[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px var(--menu-shadow); }
+.seg[aria-disabled="true"] { color: var(--muted); cursor: default; }
+.seg-count { min-width: 18px; padding: 1px 6px; border-radius: 9999px; font-size: 11px; font-weight: 800; background: var(--line); color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.seg[aria-selected="true"] .seg-count { background: var(--brand); color: #FFFFFF; }
+.seg-soon { padding: 1px 6px; border-radius: 9999px; font-size: 10px; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line-2); }
+.incoming-row { transition: background-color 0.15s; }
+.incoming-row:hover { background: var(--hover); }
+.incoming-crunch { transition: box-shadow 0.15s; }
+.incoming-crunch:hover { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--amber-fg) 45%, transparent); }
+.incoming-crunch .headsup-caret { transition: transform 0.18s; }
+.incoming-crunch[aria-expanded="true"] .headsup-caret { transform: rotate(180deg); }
+
+/* CLASS-8 Grades rows: Check in / What-if / Grades only show on the row you point at or are in
+   with the keyboard, so all classes fit under Next class. */
+.grade-actions { display: none; }
+.grade-item:hover .grade-actions,
+.grade-item:focus-within .grade-actions { display: flex; }
+.chip-btn { transition: box-shadow 0.15s; }
+.chip-btn:hover { box-shadow: inset 0 0 0 1.5px currentColor; }
+
+/* DASH-16 This term: "still to come" stripes in the class color (--c) on the category bars,
+   the 3-week calendar's items, and the class rows. Pointing at a class lights up its work on the
+   calendar and fades the rest (.term-dim). */
+.tocome { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--c) 14%, var(--surface)) 0 3px, color-mix(in srgb, var(--c) 34%, var(--surface)) 3px 6px); }
+.cal-item { transition: background-color 0.15s, box-shadow 0.15s, opacity 0.15s; }
+.cal-item:hover { box-shadow: inset 0 0 0 1.5px var(--line-2); }
+.cal-exam { background: color-mix(in srgb, var(--c) 14%, var(--surface)); }
+.cal-item.term-match { background: color-mix(in srgb, var(--c) 14%, var(--surface)); box-shadow: inset 0 0 0 1.5px var(--c); }
+.term-dim { opacity: 0.3; }
+.term-card { transition: opacity 0.15s, box-shadow 0.15s; }
+.term-card.term-dim { opacity: 0.45; }
+.term-card.term-match { box-shadow: inset 0 0 0 2px var(--c), 0 6px 16px var(--shadow); }
+.term-row { transition: background-color 0.15s, box-shadow 0.15s; }
+.term-row:hover { background: var(--hover); }
+.term-row.term-open { background: var(--hover); box-shadow: inset 0 0 0 1.5px var(--line); }
+.term-row.term-match { background: color-mix(in srgb, var(--c) 10%, var(--surface)); box-shadow: inset 0 0 0 1.5px var(--c); }
+.term-chevron { transition: background-color 0.15s; }
+.term-chevron:hover { background: var(--surface-2); }
+.term-chevron svg { transition: transform 0.18s; }
+.term-chevron[aria-expanded="true"] svg { transform: rotate(180deg); }
+/* The narrower Incoming column (below 1440px) drops the SOON badge so the three tabs fit. */
+@media (max-width: 89.99rem) { .seg { padding: 0 6px; gap: 4px; } .seg-soon { display: none; } }

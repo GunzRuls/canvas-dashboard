@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const INK = "var(--ink)";
 const MUTED = "var(--muted)";
@@ -38,67 +38,104 @@ export function Avatar({ account, size = 28 }) {
   );
 }
 
-// Top bar: which Canvas account the dashboard is showing. Click for details.
-export default function AccountChip({ account }) {
+// Top bar: which Canvas account the dashboard is showing. Its menu also holds Email summary and
+// the Dark mode switch (DASH-17), which used to be top bar buttons. Escape or a click outside closes it.
+export default function AccountChip({ account, theme, onToggleTheme, digestEnabled, sendingDigest, onEmailSummary }) {
   const [open, setOpen] = useState(false);
+  const buttonRef = useRef(null);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    menuRef.current?.querySelector("button, a")?.focus();
+    function onKey(e) {
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      buttonRef.current?.focus();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+
   if (!account) return null;
   const first = (account.shortName || account.name).split(/\s+/)[0];
+  const dark = theme === "dark";
 
   return (
     <div className="relative">
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        aria-label={`Connected to Canvas as ${account.name}`}
+        aria-haspopup="true"
+        aria-label={`Account menu: connected to Canvas as ${account.name}`}
         title={`Connected to Canvas as ${account.name}`}
-        className="btn btn-secondary h-10 gap-2 pl-1.5 pr-3 text-sm"
+        className={`btn btn-secondary h-[38px] gap-1.5 pl-1.5 pr-2.5 text-sm ${open ? "account-open" : ""}`}
       >
         <Avatar account={account} />
         <span className="max-w-[9rem] truncate">{first}</span>
+        <svg aria-hidden="true" viewBox="0 0 24 24" className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" style={{ color: MUTED }}>
+          <path d="M6 9l6 6 6-6" />
+        </svg>
       </button>
 
       {open && (
         <>
-          <button aria-label="Close" className="fixed inset-0 z-40 cursor-default" onClick={() => setOpen(false)} />
-          <div
-            role="dialog"
-            aria-label="Canvas account"
-            className="panel step-in absolute right-0 top-full z-50 mt-2 w-72 p-4 shadow-lg"
-          >
-            <p className="text-[11px] font-extrabold uppercase tracking-wide" style={{ color: MUTED }}>
-              Connected to Canvas as
-            </p>
-            <div className="mt-2 flex items-center gap-3">
-              <Avatar account={account} size={40} />
+          <button aria-label="Close" tabIndex={-1} className="fixed inset-0 z-40 cursor-default" onClick={() => setOpen(false)} />
+          <div ref={menuRef} role="group" aria-label="Account" className="account-menu panel step-in absolute right-0 top-full z-50 mt-2 flex w-[264px] flex-col gap-0.5 p-1.5">
+            <div className="flex items-center gap-2.5 border-b border-[var(--line)] px-2.5 pb-2.5 pt-1.5">
+              <Avatar account={account} size={34} />
               <div className="min-w-0">
                 <p className="truncate text-sm font-extrabold" style={{ color: INK }}>
                   {account.name}
                 </p>
-                {account.login && (
-                  <p className="truncate text-xs" style={{ color: "var(--ink-soft)" }}>
-                    {account.login}
-                  </p>
-                )}
-                <p className="truncate text-xs" style={{ color: MUTED }}>
-                  {account.school}
+                <p className="truncate text-xs" style={{ color: MUTED }} title={[account.login, account.school].filter(Boolean).join(" · ") || undefined}>
+                  Connected to Canvas
                 </p>
               </div>
             </div>
-            <div className="mt-3 flex gap-2">
-              <a href={account.profileUrl} target="_blank" rel="noreferrer" className="btn btn-soft h-8 flex-1 text-xs">
-                Canvas profile
+            {digestEnabled && (
+              <button type="button" onClick={onEmailSummary} disabled={sendingDigest} className="menu-item mt-1">
+                {MailIcon}
+                {sendingDigest ? "Sending…" : "Email summary"}
+              </button>
+            )}
+            <button type="button" role="switch" aria-checked={dark} onClick={onToggleTheme} className={`menu-item ${digestEnabled ? "" : "mt-1"}`}>
+              {MoonIcon}
+              Dark mode
+              <span className="menu-switch ml-auto" aria-hidden="true">
+                <span className="menu-knob" />
+              </span>
+            </button>
+            {account.profileUrl && (
+              <a href={account.profileUrl} target="_blank" rel="noreferrer" className="menu-item">
+                {ArrowIcon}
+                Open my Canvas profile
               </a>
-              <Link href="/setup" scroll={false} className="btn btn-soft h-8 flex-1 text-xs">
-                Change account
-              </Link>
-            </div>
-            <p className="mt-2.5 text-[11px] leading-snug" style={{ color: MUTED }}>
-              Not you? Paste your own Canvas token in Settings.
-            </p>
+            )}
+            <Link href="/setup" scroll={false} onClick={() => setOpen(false)} className="menu-item">
+              {SwapIcon}
+              Change account
+            </Link>
           </div>
         </>
       )}
     </div>
   );
 }
+
+const icon = (path) => (
+  <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" style={{ color: MUTED }}>
+    {path}
+  </svg>
+);
+const MailIcon = icon(
+  <>
+    <rect x="3" y="5" width="18" height="14" rx="3" />
+    <path d="M3 7l9 6 9-6" />
+  </>
+);
+const MoonIcon = icon(<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" />);
+const ArrowIcon = icon(<path d="M7 17L17 7M9 7h8v8" />);
+const SwapIcon = icon(<path d="M7 7h11l-3-3M17 17H6l3 3" />);

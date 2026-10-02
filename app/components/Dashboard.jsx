@@ -11,7 +11,9 @@ import EmptyState from "./EmptyState";
 import UpdateNotice from "./UpdateNotice";
 import AccountChip from "./AccountChip";
 import NextClassCard from "./NextClassCard";
-import HeadsUpCard from "./HeadsUpCard";
+import IncomingPanel from "./IncomingPanel";
+import TermView from "./TermView";
+import { useHeadsUp } from "./useHeadsUp";
 import QuickLook from "./QuickLook";
 import { useGradeGoal, GoalPill, GoalTick, GoalEditor } from "./GradeGoal";
 import WhatsNew from "./WhatsNew";
@@ -128,6 +130,7 @@ export default function Dashboard({
   account = null,
   whatsNew = null,
   loadedAt,
+  view = "today", // "today" (app/page.js) or "term" (app/term/page.js); both share this shell
 }) {
   const router = useRouter();
   const [isRefreshing, startRefresh] = useTransition();
@@ -236,6 +239,9 @@ export default function Dashboard({
   }, [toast]);
 
   const courseById = useMemo(() => Object.fromEntries(courses.map((c) => [c.id, c])), [courses]);
+  // Announcements you haven't cleared with Done (one list, so the hooks below don't redo work).
+  const activeAnnouncements = useMemo(() => announcements.filter((a) => !dismissedIds.has(a.id)), [announcements, dismissedIds]);
+  const headsUp = useHeadsUp({ now, items, announcements: activeAnnouncements, events, courses, status });
   const colorFor = (courseId) => courseById[courseId]?.color || NEUTRAL_COLOR;
   const nameFor = (courseId, fallback) => courseById[courseId]?.name || fallback || "Personal";
   const codeFor = (courseId) => displayCode(courseById[courseId]);
@@ -508,17 +514,39 @@ export default function Dashboard({
     : "\u00A0";
   const filteredCourse = filter ? courseById[filter] : null;
 
-  // Layout A ("Command sidebar", DASH-6). On wide windows (xl) everything fits one screen:
-  // top bar, then a left sidebar (Next class + Grades list) beside the main area (a slim
-  // 7-day strip over [board | announcements]). Each panel scrolls on its own, so the board gets
-  // most of the height. Narrower windows stack the same pieces and the page scrolls.
+  // Two tabs (DASH-17) share this shell: the top bar, the pop-ups (Search, Quick look, What-if,
+  // Manage classes) and the toast. On wide windows (xl) each tab fits one screen and its panels
+  // scroll on their own; narrower windows stack the pieces and the page scrolls.
+  // Today: a left sidebar (Next class + Grades) beside a slim 7-day strip over [board | Incoming].
+  // This term: TermView.jsx (3-week calendar and exams | My classes).
+  const clearAll =
+    visibleAnnouncements.length > 0 ? (
+      <button
+        onClick={() => dismissAnnouncements(visibleAnnouncements)}
+        className="text-link shrink-0 text-xs font-bold underline"
+        style={{ color: INK }}
+      >
+        Clear {filter ? "these" : "all"} ({visibleAnnouncements.length})
+      </button>
+    ) : (
+      <span className="shrink-0 text-xs" style={{ color: MUTED }}>Newest first</span>
+    );
+
   return (
     <main className="flex min-h-screen flex-col gap-4 px-4 py-4 sm:px-5 xl:h-screen xl:gap-3.5 xl:overflow-y-auto">
       {/* Top bar: one row on wide windows */}
-      <header className="flex flex-none flex-wrap items-center gap-x-4 gap-y-3 min-[90rem]:flex-nowrap">
+      <header className="relative z-30 flex flex-none flex-wrap items-center gap-x-3.5 gap-y-3 min-[90rem]:flex-nowrap">
         <h1 className="font-display whitespace-nowrap text-2xl font-extrabold tracking-tight xl:text-[26px]" style={{ color: INK }}>
           {today}
         </h1>
+        <nav aria-label="Views" className="panel flex h-[38px] flex-none gap-0.5 rounded-full p-[3px]">
+          <Link href="/" className="view-tab" aria-current={view === "today" ? "page" : undefined}>
+            Today
+          </Link>
+          <Link href="/term" className="view-tab" aria-current={view === "term" ? "page" : undefined}>
+            This term
+          </Link>
+        </nav>
         <div className="panel flex min-h-[34px] flex-wrap items-center gap-x-1 rounded-full px-2.5 py-0.5">
           <Stat value={dueThisWeek} label="due this week" color="var(--blue-fg)" />
           <Stat value={overdue} label="overdue" color={overdue ? "var(--red-fg)" : "var(--line-2)"} />
@@ -531,36 +559,42 @@ export default function Dashboard({
             />
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-2 xl:ml-auto">
+        <div className="flex flex-wrap items-center gap-2 xl:ml-auto min-[90rem]:flex-nowrap">
           <SearchButton onClick={openSearch} />
           <WhatsNew whatsNew={whatsNew} now={now} courseFor={courseFor} onOpen={openChange} />
-          {/* Icon only (sun / moon) so the top bar still fits on one row with Search and What's new. */}
-          <button
-            onClick={toggleTheme}
-            aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-            title={theme === "dark" ? "Light mode" : "Dark mode"}
-            className="btn btn-secondary h-[38px] w-[38px] px-0"
-          >
-            {theme === "dark" ? SunIcon : MoonIcon}
-          </button>
           <TopButton onClick={() => setManaging(true)}>Manage classes</TopButton>
           {/* Opens Settings as a pop-up over the dashboard (app/@modal/(.)setup). */}
           <Link href="/setup" scroll={false} className="btn btn-secondary h-[38px] px-3.5 text-sm">
             Settings
           </Link>
           <UpdateNotice />
-          {digestEnabled && (
-            <TopButton onClick={emailSummary} disabled={sendingDigest}>
-              {sendingDigest ? "Sending…" : "Email summary"}
-            </TopButton>
-          )}
           <TopButton onClick={refresh} disabled={isRefreshing} strong>
             {isRefreshing ? "Refreshing…" : "Refresh"}
           </TopButton>
-          <AccountChip account={account} />
+          {/* Email summary and Dark mode live in the account menu. */}
+          <AccountChip
+            account={account}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            digestEnabled={digestEnabled}
+            sendingDigest={sendingDigest}
+            onEmailSummary={emailSummary}
+          />
         </div>
       </header>
 
+      {view === "term" ? (
+        <TermView
+          now={now}
+          courses={courses}
+          items={items}
+          status={status}
+          headsUp={headsUp}
+          onLookItem={lookItem}
+          onLookAnnouncement={lookAnnouncement}
+          onWhatIf={setWhatIfCourse}
+        />
+      ) : (
       <div className="flex flex-col gap-4 xl:min-h-[520px] xl:flex-1 xl:flex-row">
         {/* Sidebar: Next class, then every class's grade */}
         <aside
@@ -574,7 +608,7 @@ export default function Dashboard({
               sessions={sessions}
               items={items}
               status={status}
-              announcements={announcements.filter((a) => !dismissedIds.has(a.id))}
+              announcements={activeAnnouncements}
               readIds={readIds}
               onLookItem={lookItem}
               onLookAnnouncement={lookAnnouncement}
@@ -582,22 +616,8 @@ export default function Dashboard({
             />
           </div>
 
-          {/* Heads up (DASH-13/14): exams coming up and a heavy-week warning. */}
-          <div className="flex-none">
-            <HeadsUpCard
-              now={now}
-              courses={courses}
-              items={items}
-              status={status}
-              announcements={announcements.filter((a) => !dismissedIds.has(a.id))}
-              events={events}
-              onLookItem={lookItem}
-              onLookAnnouncement={lookAnnouncement}
-            />
-          </div>
-
           <section className="panel flex flex-col px-2.5 pb-2 pt-3 xl:min-h-[160px] xl:flex-1" aria-labelledby="grades-heading">
-            <div className="flex flex-none items-baseline justify-between gap-2 px-2 pb-1.5">
+            <div className="flex flex-none items-baseline justify-between gap-2 px-2 pb-1">
               <h2 id="grades-heading" className="font-display text-lg font-extrabold tracking-tight" style={{ color: INK }}>
                 Grades
               </h2>
@@ -627,10 +647,15 @@ export default function Dashboard({
                 ))}
               </div>
             )}
+            {courses.length > 0 && (
+              <p className="hidden flex-none px-2 pb-0.5 pt-1.5 text-[11.5px] leading-snug xl:block" style={{ color: MUTED }}>
+                Check in, What-if and Grades show when you point at a class.
+              </p>
+            )}
           </section>
         </aside>
 
-        {/* Main area: slim 7-day strip, then board | announcements */}
+        {/* Main area: slim 7-day strip, then board | Incoming */}
         <div className="flex min-w-0 flex-col gap-4 xl:min-h-0 xl:flex-1 xl:gap-3.5">
           <WeekStrip
             items={visibleItems}
@@ -748,33 +773,23 @@ export default function Dashboard({
           </div>
         </section>
 
-        {/* Announcements */}
-        <section className="flex min-h-0 min-w-0 flex-col" aria-labelledby="announcements-heading">
-          {/* Same height as the Assignments heading row, so both lists start on one line. */}
-          <div className="mb-2.5 flex flex-none items-center justify-between gap-2 md:min-h-[44px]">
-            <h2 id="announcements-heading" className="font-display truncate text-xl font-extrabold tracking-tight" style={{ color: INK }}>
-              Announcements
-            </h2>
-            {visibleAnnouncements.length > 0 ? (
-              <button
-                onClick={() => dismissAnnouncements(visibleAnnouncements)}
-                className="text-link shrink-0 text-xs font-bold underline"
-                style={{ color: INK }}
-              >
-                Clear {filter ? "these" : "all"} ({visibleAnnouncements.length})
-              </button>
-            ) : (
-              <span className="shrink-0 text-xs" style={{ color: MUTED }}>Newest first</span>
-            )}
-          </div>
-          <div className="min-h-0 flex-1 xl:overflow-y-auto xl:pr-1">
-            {visibleAnnouncements.length === 0 ? (
+        {/* Incoming (DASH-15): Heads up | News (announcements) */}
+        <IncomingPanel
+          now={now}
+          headsUp={headsUp}
+          courses={courses}
+          onLookItem={lookItem}
+          onLookAnnouncement={lookAnnouncement}
+          newsCount={visibleAnnouncements.length}
+          clearAll={clearAll}
+          news={
+            visibleAnnouncements.length === 0 ? (
               <EmptyState kind="news" />
             ) : (
               <CardList
                 cards={visibleAnnouncements}
                 collapseAfter={12}
-                listClassName="panel flex flex-col divide-y divide-[var(--line)] overflow-hidden"
+                listClassName="panel flex flex-col divide-y divide-[var(--chip)] overflow-hidden"
                 renderCard={(a) => (
                   <AnnouncementCard
                     key={a.id}
@@ -790,13 +805,13 @@ export default function Dashboard({
                   />
                 )}
               />
-            )}
-          </div>
-        </section>
+            )
+          }
+        />
       </div>
         </div>
       </div>
-
+      )}
       <SearchPalette
         open={searching}
         onOpen={openSearch}
@@ -806,7 +821,7 @@ export default function Dashboard({
         courses={courses}
         items={items}
         status={status}
-        announcements={announcements.filter((a) => !dismissedIds.has(a.id))}
+        announcements={activeAnnouncements}
         dismissedIds={dismissedIds}
         now={now}
         colorFor={colorFor}
@@ -894,18 +909,6 @@ function readSetFrom(items, announcements) {
 
 // ---------- pieces ----------
 
-const SunIcon = (
-  <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-    <circle cx="12" cy="12" r="4" />
-    <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
-  </svg>
-);
-const MoonIcon = (
-  <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" />
-  </svg>
-);
-
 function TopButton({ children, onClick, disabled, strong, label }) {
   return (
     <button
@@ -940,25 +943,26 @@ function formatNumber(n) {
   return Number.isInteger(Number(n)) ? String(n) : Number(n).toFixed(1);
 }
 
-// One class in the sidebar's Grades list: a small ring, the name (opens the course home), code and
-// grade, then Check in / What-if / Grades and the "N new" chip. Clicking the row anywhere that isn't
-// a link or button focuses the page on this class. New grades open inline (no pop-over), so the
-// list can scroll without cutting it off. The grade goal (CLASS-6) adds a tick on the ring, a status
-// pill after the grade, and an inline goal picker (GradeGoal.jsx).
+// One class in the sidebar's Grades list (CLASS-8), compact so every class fits under Next class:
+// a ring with the goal tick, the name (opens the course home) and the "N new" chip, then code ·
+// grade and the goal pill. Check in / What-if / Grades show only while you point at the row or
+// are inside it with the keyboard (.grade-actions in globals.css). Clicking the row anywhere that
+// isn't a link or button focuses the page on this class. New grades and the goal picker open
+// inline, so the list can scroll without cutting them off.
 function GradeRow({ course, active, dimmed, onSelect, onWhatIf, newGrades, onSeen }) {
   const [open, setOpen] = useState(false);
   const [goalOpen, setGoalOpen] = useState(false);
   const goalPillRef = useRef(null);
-  const g = useGradeGoal(course);
+  const g = useGradeGoal(course, goalOpen);
   const goalPanelId = `goal-${course.id}`;
   const score = course.score;
   const hasNew = newGrades.length > 0;
   const pct = score === null ? 0 : Math.max(0, Math.min(100, Number(score)));
   const code = displayCode(course);
-  const chip = "pointer-events-auto rounded-md px-2 py-0.5 text-[11px] font-bold";
+  const chip = "chip-btn pointer-events-auto rounded-md px-2 py-0.5 text-[11.5px] font-bold";
   return (
     <div
-      className={`grade-item relative flex gap-3 rounded-2xl px-2 py-1.5 transition-opacity ${active ? "c-tint" : "row-hover"}`}
+      className={`grade-item relative flex flex-col gap-[5px] rounded-[14px] px-2 py-[5px] transition-opacity ${active ? "c-tint" : "row-hover"}`}
       style={{
         "--c": course.color,
         opacity: dimmed ? 0.45 : 1,
@@ -970,156 +974,159 @@ function GradeRow({ course, active, dimmed, onSelect, onWhatIf, newGrades, onSee
         aria-pressed={active}
         aria-label={`Show only ${course.name}`}
         title={active ? "Show all classes" : "Show only this class"}
-        className="absolute inset-0 rounded-2xl"
+        className="absolute inset-0 rounded-[14px]"
       />
-      <div
-        className="grade-ring pointer-events-none relative mt-0.5 grid h-[46px] w-[46px] shrink-0 place-items-center rounded-full"
-        style={{
-          background: `conic-gradient(var(--c) ${pct * 3.6}deg, color-mix(in srgb, var(--c) 16%, var(--surface-2)) 0)`,
-        }}
-        aria-hidden="true"
-      >
-        <GoalTick goal={g.goal} />
-        <div className="grid h-[34px] w-[34px] place-items-center rounded-full bg-[var(--surface)]">
-          <span className="font-display text-[11px] font-extrabold tracking-tight" style={{ color: INK }}>
-            {score === null ? "–" : `${Math.round(score)}%`}
-          </span>
+      <div className="pointer-events-none relative flex items-center gap-[11px]">
+        <div
+          className="grade-ring relative grid h-10 w-10 shrink-0 place-items-center rounded-full"
+          style={{
+            background: `conic-gradient(var(--c) ${pct * 3.6}deg, color-mix(in srgb, var(--c) 16%, var(--surface-2)) 0)`,
+          }}
+          aria-hidden="true"
+        >
+          <GoalTick goal={g.goal} />
+          <div className="grid h-[30px] w-[30px] place-items-center rounded-full bg-[var(--surface)]">
+            <span className="font-display text-[10.5px] font-extrabold tracking-tight" style={{ color: INK }}>
+              {score === null ? "–" : Math.round(score) >= 100 ? "100" : `${Math.round(score)}%`}
+            </span>
+          </div>
         </div>
-      </div>
 
-      <div className="pointer-events-none relative flex min-w-0 flex-1 flex-col gap-0.5">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <a
-            href={course.homeUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="pointer-events-auto flex min-w-0 items-center gap-1 text-sm font-bold leading-snug hover:underline"
-            style={{ color: INK }}
-            title={`Open ${course.name} in Canvas`}
-          >
-            <span className="truncate">{course.name}</span>
-            <svg aria-hidden="true" viewBox="0 0 12 12" className="h-2.5 w-2.5 shrink-0 opacity-60">
-              <path d="M3.5 2.5h6v6M9.5 2.5 2.5 9.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
-          </a>
-          {hasNew && (
-            <button
-              onClick={() => setOpen(!open)}
-              aria-expanded={open}
-              className={`${chip} ml-auto shrink-0 font-extrabold hover:brightness-95`}
-              style={{ background: "var(--green-bg)", color: "var(--green-fg)" }}
-            >
-              {newGrades.length} new
-            </button>
-          )}
-        </div>
-        <div className="flex min-w-0 items-center gap-1.5">
-          <p className="min-w-0 flex-1 truncate text-xs font-semibold tabular-nums" style={{ color: MUTED }}>
-            {code && (
-              <>
-                <span className="c-text font-bold">{code}</span>
-                {" · "}
-              </>
-            )}
-            {score === null ? "No grade yet" : `${Number(score).toFixed(1)}%${course.grade ? ` · ${course.grade}` : ""}`}
-          </p>
-          <span ref={goalPillRef} className="contents">
-            <GoalPill
-              goal={g.goal}
-              status={g.status}
-              loading={g.loading}
-              open={goalOpen}
-              controls={goalPanelId}
-              courseName={course.name}
-              onToggle={() => setGoalOpen(!goalOpen)}
-            />
-          </span>
-        </div>
-        <div className="mt-0.5 flex flex-wrap gap-1">
-          {course.attendanceUrl && (
+        <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
+          <div className="flex min-w-0 items-center gap-1.5">
             <a
-              href={course.attendanceUrl}
+              href={course.homeUrl}
               target="_blank"
               rel="noreferrer"
-              className={`${chip} c-tint c-text hover:brightness-95`}
-              title="Open A+ Attendance for this class"
+              className="pointer-events-auto flex min-w-0 items-center gap-1 text-sm font-bold leading-snug hover:underline"
+              style={{ color: INK }}
+              title={`Open ${course.name} in Canvas`}
             >
-              Check in
+              <span className="truncate">{course.name}</span>
+              <svg aria-hidden="true" viewBox="0 0 12 12" className="h-2.5 w-2.5 shrink-0" style={{ color: MUTED }}>
+                <path d="M3.5 2.5h6v6M9.5 2.5 2.5 9.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
             </a>
-          )}
-          <button onClick={onWhatIf} className={`${chip} bg-[var(--chip)] hover:bg-[var(--surface-3)]`} style={{ color: INK }}>
-            What-if
-          </button>
+            {hasNew && (
+              <button
+                onClick={() => setOpen(!open)}
+                aria-expanded={open}
+                className={`${chip} ml-auto shrink-0 px-[7px] font-extrabold`}
+                style={{ background: "var(--green-bg)", color: "var(--green-fg)" }}
+              >
+                {newGrades.length} new
+              </button>
+            )}
+          </div>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <p className="min-w-0 flex-1 truncate text-xs tabular-nums" style={{ color: MUTED }}>
+              {code && (
+                <>
+                  <b className="c-text font-bold">{code}</b>
+                  {" · "}
+                </>
+              )}
+              {score === null ? "No grade yet" : `${Number(score).toFixed(1)}%${course.grade ? ` · ${course.grade}` : ""}`}
+            </p>
+            <span ref={goalPillRef} className="contents">
+              <GoalPill
+                goal={g.goal}
+                status={g.status}
+                loading={g.loading}
+                open={goalOpen}
+                controls={goalPanelId}
+                courseName={course.name}
+                onToggle={() => setGoalOpen(!goalOpen)}
+              />
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="grade-actions pointer-events-none relative gap-[5px] pl-[51px]">
+        {course.attendanceUrl && (
           <a
-            href={course.gradesUrl}
+            href={course.attendanceUrl}
             target="_blank"
             rel="noreferrer"
-            className={`${chip} bg-[var(--chip)] hover:bg-[var(--surface-3)]`}
-            style={{ color: INK }}
+            className={`${chip} c-tint c-text`}
+            title="Open A+ Attendance for this class"
           >
-            Grades
+            Check in
           </a>
-        </div>
-
-        {goalOpen && (
-          <GoalEditor
-            id={goalPanelId}
-            goal={g.goal}
-            status={g.status}
-            failed={g.failed}
-            error={g.error}
-            hasDropRules={g.outlook?.hasDropRules}
-            unposted={g.outlook?.unposted}
-            onSave={g.save}
-            onClose={() => {
-              setGoalOpen(false);
-              goalPillRef.current?.querySelector("button")?.focus();
-            }}
-          />
         )}
-
-        {hasNew && open && (
-          <div className="pointer-events-auto mt-1.5 rounded-xl bg-[var(--surface)] p-2.5 shadow-[0_0_0_1px_var(--line)]" role="group" aria-label="New grades">
-            <div className="mb-1.5 flex items-center justify-between gap-2">
-              <span className="text-xs font-extrabold" style={{ color: INK }}>
-                {newGrades.length} new grade{newGrades.length === 1 ? "" : "s"}
-              </span>
-              <button
-                onClick={() => {
-                  setOpen(false);
-                  onSeen(newGrades);
-                }}
-                className="btn btn-soft h-7 px-2.5 text-xs"
-              >
-                Got it
-              </button>
-            </div>
-            <ul className="space-y-1">
-              {newGrades.slice(0, 6).map((g) => (
-                <li key={g.key} className="flex items-baseline justify-between gap-2 text-xs">
-                  <a
-                    href={g.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={() => onSeen([g])}
-                    className="truncate font-semibold hover:underline"
-                    style={{ color: "var(--ink-soft)" }}
-                    title={g.name}
-                  >
-                    {g.name}
-                  </a>
-                  <span className="c-text shrink-0 font-extrabold">{scoreText(g)}</span>
-                </li>
-              ))}
-              {newGrades.length > 6 && (
-                <li className="text-xs" style={{ color: MUTED }}>
-                  and {newGrades.length - 6} more
-                </li>
-              )}
-            </ul>
-          </div>
-        )}
+        <button onClick={onWhatIf} className={`${chip} bg-[var(--surface-2)]`} style={{ color: "var(--ink-soft)" }}>
+          What-if
+        </button>
+        <a href={course.gradesUrl} target="_blank" rel="noreferrer" className={`${chip} bg-[var(--surface-2)]`} style={{ color: "var(--ink-soft)" }}>
+          Grades
+        </a>
       </div>
+
+      {(goalOpen || (hasNew && open)) && (
+        <div className="pointer-events-none relative pl-[51px]">
+          {goalOpen && (
+            <GoalEditor
+              id={goalPanelId}
+              goal={g.goal}
+              status={g.status}
+              failed={g.failed}
+              error={g.error}
+              hasDropRules={g.outlook?.hasDropRules}
+              unposted={g.outlook?.unposted}
+              scale={g.outlook?.scheme}
+              scaleReady={g.scaleReady}
+              onSave={g.save}
+              onClose={() => {
+                setGoalOpen(false);
+                goalPillRef.current?.querySelector("button")?.focus();
+              }}
+            />
+          )}
+
+          {hasNew && open && (
+            <div className="pointer-events-auto mt-1.5 rounded-xl bg-[var(--surface)] p-2.5 shadow-[0_0_0_1px_var(--line)]" role="group" aria-label="New grades">
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <span className="text-xs font-extrabold" style={{ color: INK }}>
+                  {newGrades.length} new grade{newGrades.length === 1 ? "" : "s"}
+                </span>
+                <button
+                  onClick={() => {
+                    setOpen(false);
+                    onSeen(newGrades);
+                  }}
+                  className="btn btn-soft h-7 px-2.5 text-xs"
+                >
+                  Got it
+                </button>
+              </div>
+              <ul className="space-y-1">
+                {newGrades.slice(0, 6).map((g) => (
+                  <li key={g.key} className="flex items-baseline justify-between gap-2 text-xs">
+                    <a
+                      href={g.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={() => onSeen([g])}
+                      className="truncate font-semibold hover:underline"
+                      style={{ color: "var(--ink-soft)" }}
+                      title={g.name}
+                    >
+                      {g.name}
+                    </a>
+                    <span className="c-text shrink-0 font-extrabold">{scoreText(g)}</span>
+                  </li>
+                ))}
+                {newGrades.length > 6 && (
+                  <li className="text-xs" style={{ color: MUTED }}>
+                    and {newGrades.length - 6} more
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -1259,7 +1266,7 @@ function TaskCard({
   const titleStyle = { color: INK, textDecoration: done ? "line-through" : undefined };
   const linked = (item.announcements || []).filter((a) => !dismissedIds.has(a.id));
 
-  // Compact card (Layout A): class + due on one line, the title on one line (full title on hover),
+  // Compact card (Today tab): class + due on one line, the title on one line (full title on hover),
   // then date, status badges and the actions on the last line, so a column shows ~5 cards.
   return (
     <article
@@ -1403,15 +1410,15 @@ function CourseCode({ code }) {
 
 function AnnouncementCard({ announcement: a, now, unread, color, courseName, courseCode, onRead, onLook, onDone }) {
   return (
-    <article className="row-hover px-4 py-3" style={{ "--c": color, opacity: unread ? 1 : 0.72 }}>
-      <div className="flex items-center justify-between gap-2 text-xs">
+    <article className="row-hover flex flex-col gap-[5px] px-4 py-[13px]" style={{ "--c": color, opacity: unread ? 1 : 0.72 }}>
+      <div className="flex min-w-0 items-center gap-1.5 text-xs">
         <span className="c-text flex min-w-0 items-center gap-1.5 font-bold" title={courseCode ? `${courseName} (${courseCode})` : courseName}>
           <span className="c-dot h-2 w-2 shrink-0 rounded-full" aria-hidden="true" />
           <span className="truncate">{courseName}</span>
           <CourseCode code={courseCode} />
         </span>
-        <span className="shrink-0 font-semibold" style={{ color: MUTED }}>
-          {now ? timeAgo(a.postedAt, now) : "\u00A0"}
+        <span className="ml-auto shrink-0 font-medium" style={{ color: MUTED }}>
+          {now ? timeAgo(a.postedAt, now) : " "}
         </span>
       </div>
       <a
@@ -1419,28 +1426,28 @@ function AnnouncementCard({ announcement: a, now, unread, color, courseName, cou
         target="_blank"
         rel="noreferrer"
         onClick={onLook}
-        className="mt-1 flex items-start gap-1.5 text-sm font-bold leading-snug hover:underline"
+        className="font-display flex items-start gap-1.5 text-[15px] font-bold leading-tight hover:underline"
         style={{ color: INK }}
       >
         {unread && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[var(--brand)]" aria-label="Unread" />}
         <span className="line-clamp-2">{a.title}</span>
       </a>
       {a.preview && (
-        <p className="mt-1 line-clamp-2 text-xs leading-relaxed" style={{ color: "var(--ink-soft)" }}>
+        <p className="line-clamp-2 text-[13px] leading-[1.45]" style={{ color: "var(--ink-soft)" }}>
           {a.preview}
         </p>
       )}
-      <div className="mt-2 flex items-center justify-between gap-2 text-xs">
+      <div className="mt-0.5 flex items-center justify-between gap-2 text-xs">
         <span className="truncate" style={{ color: MUTED }}>
           {a.author}
         </span>
         <span className="flex shrink-0 items-center gap-2">
           {unread && (
-            <button onClick={onRead} className="font-bold hover:underline" style={{ color: MUTED }}>
+            <button onClick={onRead} className="text-link font-bold hover:underline" style={{ color: MUTED }}>
               Mark read
             </button>
           )}
-          <button onClick={onDone} className="btn-course rounded-md px-2 py-0.5 font-bold">
+          <button onClick={onDone} className="btn btn-course h-[26px] rounded-lg px-2.5 text-xs">
             Done
           </button>
         </span>
