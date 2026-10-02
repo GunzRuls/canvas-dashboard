@@ -16,13 +16,19 @@ const nextConfig = {
   // Browser protections on every response (proxy.js handles who may send requests):
   // no framing by other sites (clickjacking, e.g. a hidden Uninstall click), no other site
   // loading our files, no guessing file types, and no localhost addresses sent to Canvas.
+  poweredByHeader: false,
   async headers() {
     return [
       {
         source: "/:path*",
         headers: [
           { key: "X-Frame-Options", value: "DENY" },
-          { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+          // Also: no plugins (<object>/<embed>), no <base> tag changing where links go, and forms
+          // only submit to the dashboard itself. These limit what injected HTML could do.
+          {
+            key: "Content-Security-Policy",
+            value: "frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'",
+          },
           { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "no-referrer" },
