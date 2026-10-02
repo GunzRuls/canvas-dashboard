@@ -12,6 +12,7 @@ import UpdateNotice from "./UpdateNotice";
 import AccountChip from "./AccountChip";
 import NextClassCard from "./NextClassCard";
 import QuickLook from "./QuickLook";
+import SearchPalette, { SearchButton } from "./SearchPalette";
 import { displayCode } from "@/lib/courseNames";
 
 const INK = "var(--ink)";
@@ -145,6 +146,7 @@ export default function Dashboard({
   const [seenGradeKeys, setSeenGradeKeys] = useState(new Set());
   const [theme, setTheme] = useState(null); // "light" | "dark", read after load
   const [look, setLook] = useState(null); // the Quick look pop-up's item, see openLook
+  const [searching, setSearching] = useState(false); // the Ctrl+K search pop-up (SearchPalette.jsx)
 
   const refresh = () => startRefresh(() => router.refresh());
 
@@ -500,6 +502,7 @@ export default function Dashboard({
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2 xl:ml-auto">
+          <SearchButton onClick={() => setSearching(true)} />
           <TopButton onClick={toggleTheme} label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
             {theme === "dark" ? "Light mode" : "Dark mode"}
           </TopButton>
@@ -742,6 +745,22 @@ export default function Dashboard({
         </div>
       </div>
 
+      <SearchPalette
+        open={searching}
+        onOpen={() => setSearching(true)}
+        onClose={() => setSearching(false)}
+        courses={courses}
+        items={items}
+        status={status}
+        announcements={announcements.filter((a) => !dismissedIds.has(a.id))}
+        dismissedIds={dismissedIds}
+        now={now}
+        colorFor={colorFor}
+        nameFor={nameFor}
+        onFilter={setFilter}
+        onLookItem={lookItem}
+        onLookAnnouncement={lookAnnouncement}
+      />
       {whatIfCourse &&<WhatIfPanel course={whatIfCourse} onClose={() => setWhatIfCourse(null)} />}
       {look && (
         <QuickLook
