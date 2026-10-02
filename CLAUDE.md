@@ -111,3 +111,4 @@ He and Claude plan work on a private kanban board: https://claude.ai/artifact/4y
 - Move cards as work progresses (`progress` → `you` or `ready`) and set `github: true` when pushed, `installer: true` when in a published release.
 - New cards get the next number in their area. Areas: DASH Dashboard, CLASS Classes, CAL Calendars, MAIL Email, SET Settings, SAFE Safety, REL Releases, PARK Parked. IDs never change.
 - Write card text plainly for him (no file paths needed). Label any preview built on made-up data as "example data".
+- One feature per card (he asked after DASH-10 mixed several): split new work into separate cards, and put replies on the card the topic belongs to. Screenshots go to the chat, not the board, so say "pictures in chat".
