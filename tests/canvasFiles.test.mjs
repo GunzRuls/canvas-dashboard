@@ -2,7 +2,7 @@
 // Files list, and naming their type and size. Run with: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fileLinksIn, fileRef, fileKind, formatSize, MAX_FILES } from "../lib/canvasFiles.js";
+import { fileLinksIn, fileRef, fileKind, formatSize, dropFileOnlyBlocks, MAX_FILES } from "../lib/canvasFiles.js";
 
 const CANVAS = "https://floridapoly.instructure.com";
 
@@ -91,4 +91,46 @@ test("sizes read like File Explorer", () => {
   assert.equal(formatSize(null), "");
   assert.equal(formatSize(undefined), "");
   assert.equal(formatSize("abc"), "");
+});
+
+// dropFileOnlyBlocks works on cleanHtml's output, so these inputs look like that.
+const F = (id, text = "Assignment_3_GraphAlgorithms.pdf") =>
+  `<a href="${CANVAS}/courses/11/files/${id}?wrap=1" target="_blank" rel="noreferrer">${text}</a>`;
+
+test("a paragraph that is only a link to a listed file is removed", () => {
+  const html = `<p>Answer every question.</p><p>&nbsp;${F(501)}<br /></p><p><span><img src="${CANVAS}/images/file.png" alt="" /> ${F(502, "Data.zip")}</span></p>`;
+  assert.equal(dropFileOnlyBlocks(html, ["501", "502"], CANVAS), "<p>Answer every question.</p>");
+});
+
+test("instructions that were only the file link become empty", () => {
+  assert.equal(dropFileOnlyBlocks(`<p>${F(501)}</p>`, ["501"], CANVAS), "");
+  assert.equal(dropFileOnlyBlocks(`<div><p>${F(501)}</p>\n<p>&nbsp;</p></div>`, ["501"], CANVAS), "");
+  assert.equal(dropFileOnlyBlocks(`<ul><li>${F(501)}</li></ul>`, ["501"], CANVAS), "");
+  assert.equal(dropFileOnlyBlocks("", ["501"], CANVAS), "");
+});
+
+test("a file link inside a sentence stays", () => {
+  const html = `<p>Use the graph in ${F(501, "the handout")} for question 2.</p>`;
+  assert.equal(dropFileOnlyBlocks(html, ["501"], CANVAS), html);
+});
+
+test("links that aren't listed files stay", () => {
+  const other = `<p><a href="https://example.com/notes" target="_blank" rel="noreferrer">Notes</a></p>`;
+  assert.equal(dropFileOnlyBlocks(other, ["501"], CANVAS), other);
+  const unlisted = `<p>${F(777)}</p>`;
+  assert.equal(dropFileOnlyBlocks(unlisted, ["501"], CANVAS), unlisted);
+  const mixed = `<p>${F(501)} <a href="${CANVAS}/courses/11/assignments/9" target="_blank" rel="noreferrer">Rubric</a></p>`;
+  assert.equal(dropFileOnlyBlocks(mixed, ["501"], CANVAS), mixed);
+  assert.equal(dropFileOnlyBlocks(unlisted, [], CANVAS), unlisted);
+});
+
+test("a picture on its own is kept", () => {
+  const html = `<p><img src="${CANVAS}/courses/11/files/9/preview" alt="Graph" /></p>`;
+  assert.equal(dropFileOnlyBlocks(html, ["501"], CANVAS), html);
+});
+
+test("works on Canvas's real markup after cleanHtml", async () => {
+  const { cleanHtml } = await import("../lib/sanitizeHtml.js");
+  const raw = `<p><a class="instructure_file_link instructure_scribd_file inline_disabled" title="Assignment_3_GraphAlgorithms.pdf" href="/courses/11/files/501?wrap=1" target="_blank" data-api-endpoint="https://floridapoly.instructure.com/api/v1/courses/11/files/501" data-api-returntype="File">Assignment_3_GraphAlgorithms.pdf</a></p>`;
+  assert.equal(dropFileOnlyBlocks(cleanHtml(raw, CANVAS), ["501"], CANVAS), "");
 });

@@ -2,7 +2,7 @@
 // made-up grades below. Run with: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { cleanGoal, goalOutlook, goalStatus } from "../lib/gradeGoals.js";
+import { cleanGoal, goalOutlook, goalStatus, letterScale, letterFor } from "../lib/gradeGoals.js";
 
 const graded = (id, score, points) => ({ id, score, points, graded: true, excused: false });
 const ungraded = (id, points) => ({ id, score: null, points, graded: false, excused: false });
@@ -29,18 +29,19 @@ test("outlook: current grade and the 0% / 100% ends", () => {
   assert.equal(o.hasDropRules, false);
 });
 
-test("need more than your current grade: amber 'Need X%'", () => {
+test("need more than your current grade: amber 'Avg X% on rest'", () => {
   // (90 - 42.5) / (92.5 - 42.5) = 95%, above the current 85%
   const s = goalStatus(goalOutlook(pointsClass), 90);
   assert.equal(s.kind, "needed");
   assert.equal(s.tone, "warn");
-  assert.equal(s.label, "Need 95%");
+  assert.equal(s.label, "Avg 95% on rest");
   close(s.needed, 95, "needed");
+  assert.match(s.detail, /^To finish at 90%, you need to average 95% on all the work still left in this class/);
 });
 
 test("the shown percent rounds up, never down", () => {
-  // (86.3 - 42.5) / 50 = 87.6% -> "Need 88%"
-  assert.equal(goalStatus(goalOutlook(pointsClass), 86.3).label, "Need 88%");
+  // (86.3 - 42.5) / 50 = 87.6% -> "Avg 88% on rest"
+  assert.equal(goalStatus(goalOutlook(pointsClass), 86.3).label, "Avg 88% on rest");
 });
 
 test("on track when the needed average is at or below your current grade", () => {
@@ -81,7 +82,7 @@ test("weighted class: the empty exam group joins once it's filled in", () => {
   // (90 - 36) / 60 = 90% <= 90%: on track
   assert.equal(goalStatus(o, 90).kind, "ontrack");
   // (93 - 36) / 60 = 95%
-  assert.equal(goalStatus(o, 93).label, "Need 95%");
+  assert.equal(goalStatus(o, 93).label, "Avg 95% on rest");
 });
 
 test("nothing left to grade: locked in or missed", () => {
@@ -98,7 +99,7 @@ test("nothing graded yet: shows what's needed without a pace to compare", () => 
   const s = goalStatus(goalOutlook(fresh), 80);
   assert.equal(s.kind, "needed");
   assert.equal(s.tone, "plain");
-  assert.equal(s.label, "Need 80%");
+  assert.equal(s.label, "Avg 80% on rest");
 });
 
 test("no goal or no data means no status", () => {
@@ -136,4 +137,37 @@ test("weighted class: a category with nothing posted yet still counts; 0% catego
   close(o.atFull, 96, "atFull"); // 36 + 60
   // (90 - 36) / 60 = 90%
   assert.equal(goalStatus(o, 90).kind, "ontrack");
+});
+
+test("the wording names the goal and its letter from the class's scale", () => {
+  // The shape Canvas sends (courses/:id?include[]=grading_scheme).
+  const scheme = [["A", 0.93], ["A-", 0.9], ["B+", 0.87], ["B", 0.83], ["B-", 0.8], ["F", 0]];
+  const o = goalOutlook({ ...pointsClass, scheme });
+  // (85 - 42.5) / 50 = 85% <= 85%: on track
+  assert.equal(
+    goalStatus(o, 85).detail,
+    "You're averaging enough: keep scoring about 85% on what's left to finish at 85% (B)."
+  );
+  // (86.3 - 42.5) / 50 = 87.6% -> 88%; 86.3 is a B on this scale
+  assert.equal(
+    goalStatus(o, 86.3).detail,
+    "To finish at 86.3% (B), you need to average 88% on all the work still left in this class (every assignment, quiz and exam not graded yet), weighted the way Canvas weighs it."
+  );
+  // best case 92.5%
+  assert.equal(goalStatus(o, 95).detail, "Even 100% on everything left ends at 92.5%, below your 95% (A) goal.");
+  // no scale: no letter
+  assert.equal(goalStatus(goalOutlook(pointsClass), 95).detail, "Even 100% on everything left ends at 92.5%, below your 95% goal.");
+});
+
+test("letter scale: fractions or percents, highest first, junk skipped", () => {
+  const scale = letterScale([{ name: "B", value: 80 }, { name: "A", value: 0.9 }, { name: "", value: 0.5 }, { name: "X", value: "abc" }, { name: "F", value: 0 }]);
+  assert.deepEqual(scale, [{ name: "A", min: 90 }, { name: "B", min: 80 }, { name: "F", min: 0 }]);
+  assert.equal(letterFor(90, scale), "A");
+  assert.equal(letterFor(89.99, scale), "B");
+  assert.equal(letterFor(10, scale), "F");
+  assert.equal(letterFor(90, []), "");
+  assert.deepEqual(letterScale(null), []);
+  assert.deepEqual(letterScale([["A", 0.94], ["B-", 0.8], [null, 0.5], ["X"]]), [{ name: "A", min: 94 }, { name: "B-", min: 80 }]);
+  // The owner's example: 80% is a B- on Florida Poly's usual scale.
+  assert.equal(letterFor(80, letterScale([["B", 0.84], ["B-", 0.8], ["C+", 0.77]])), "B-");
 });

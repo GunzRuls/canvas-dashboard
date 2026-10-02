@@ -179,7 +179,9 @@ function useShortcut(open, onOpen, onClose) {
 }
 
 // Props come from Dashboard.jsx: the page's data and its own open handlers, so a result does
-// exactly what clicking the same thing on the dashboard does.
+// exactly what clicking the same thing on the dashboard does. `restore` (the state onPicked handed
+// out when a result opened Quick look) brings back the same words, results and highlighted row
+// when Search reopens after that Quick look is closed with Close or Escape.
 export default function SearchPalette({ open, onOpen, onClose, ...rest }) {
   useShortcut(open, onOpen, onClose);
   if (!open) return null;
@@ -201,10 +203,12 @@ function Palette({
   onFilter,
   onLookItem,
   onLookAnnouncement,
+  restore,
+  onPicked,
 }) {
-  const [query, setQuery] = useState("");
-  const [active, setActive] = useState(0);
-  const [fileResults, setFileResults] = useState({}); // search word -> { list, skipped, error }, while open
+  const [query, setQuery] = useState(restore?.query ?? "");
+  const [active, setActive] = useState(restore?.active ?? 0);
+  const [fileResults, setFileResults] = useState(restore?.fileResults ?? {}); // search word -> { list, skipped, error }, while open
   const dialogRef = useRef(null);
   const inputRef = useRef(null);
   const uid = useId();
@@ -394,7 +398,11 @@ function Palette({
       onLookItem(e, entry.item);
     }
     if (entry.kind === "announcement") onLookAnnouncement(e, entry.a);
-    if (e.defaultPrevented) onClose();
+    if (e.defaultPrevented) {
+      // Quick look took it: remember this search so closing Quick look can come back to it.
+      onPicked?.({ query, active: activeIndex, fileResults });
+      onClose();
+    }
     else setTimeout(onClose, 0);
   }
 

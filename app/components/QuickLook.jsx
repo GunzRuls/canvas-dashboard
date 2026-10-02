@@ -48,7 +48,7 @@ function useDialog(ref, onClose) {
     function onKey(e) {
       if (e.key === "Escape") {
         e.preventDefault();
-        closeRef.current();
+        closeRef.current("dismiss");
         return;
       }
       if (e.key !== "Tab" || !node) return;
@@ -262,6 +262,8 @@ const ArrowIcon = (
 // `target`: { kind: "item" | "announcement", type, courseId, id, title, url }
 // `boardStatus` ("todo" | "doing" | "done") and `onMove` come from the board (items only);
 // `onDismiss` is the announcement's Done (hide + mark read).
+// onClose(reason): "dismiss" for Close or Escape, "backdrop" for a click outside. Dashboard uses it
+// to bring Search back after a dismiss when Quick look was opened from Search.
 export default function QuickLook({ target, course, now, boardStatus, onMove, onDismiss, onClose }) {
   const [look, setLook] = useState(null);
   const [error, setError] = useState(null);
@@ -294,7 +296,7 @@ export default function QuickLook({ target, course, now, boardStatus, onMove, on
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <button className="modal-backdrop absolute inset-0 cursor-default" onClick={onClose} aria-label="Close quick look" tabIndex={-1} />
+      <button className="modal-backdrop absolute inset-0 cursor-default" onClick={() => onClose("backdrop")} aria-label="Close quick look" tabIndex={-1} />
       <div
         ref={dialogRef}
         role="dialog"
@@ -327,7 +329,7 @@ export default function QuickLook({ target, course, now, boardStatus, onMove, on
                   {title}
                 </h2>
               </div>
-              <button onClick={onClose} className="btn btn-secondary shrink-0 px-3.5 py-2 text-[13px]">
+              <button onClick={() => onClose("dismiss")} className="btn btn-secondary shrink-0 px-3.5 py-2 text-[13px]">
                 Close
               </button>
             </div>
@@ -426,7 +428,8 @@ export default function QuickLook({ target, course, now, boardStatus, onMove, on
                   </p>
                 )}
 
-                {(look.html || !look.lockNote) && (
+                {/* No text but files (e.g. instructions that were only a file link): the Files list says it all. */}
+                {(look.html || (!look.lockNote && !look.files?.length)) && (
                   <section className="rounded-2xl bg-[var(--surface)] px-5 py-4" style={{ boxShadow: "inset 0 0 0 1px var(--line)" }} aria-label={isAnnouncement ? "Message" : "Instructions"}>
                     <p className="mb-2 text-[11px] font-extrabold uppercase tracking-wide" style={{ color: MUTED }}>
                       {isAnnouncement || look.type === "announcement" || look.type === "discussion" ? "Message" : "Instructions"}

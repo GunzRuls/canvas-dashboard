@@ -152,6 +152,9 @@ export default function Dashboard({
   const [theme, setTheme] = useState(null); // "light" | "dark", read after load
   const [look, setLook] = useState(null); // the Quick look pop-up's item, see openLook
   const [searching, setSearching] = useState(false); // the Ctrl+K search pop-up (SearchPalette.jsx)
+  // Search's words, results and row when one of its results opened Quick look: closing that Quick
+  // look with Close or Escape reopens Search just as it was; a click outside closes everything.
+  const [searchReturn, setSearchReturn] = useState(null);
 
   const refresh = () => startRefresh(() => router.refresh());
 
@@ -456,7 +459,14 @@ export default function Dashboard({
   function openLook(e, target) {
     if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
     e.preventDefault(); // also tells RedirectCard to leave this click alone
+    setSearchReturn(null); // Search sets it again right after when it opened this
     setLook(target);
+  }
+
+  // A fresh Search (button, Ctrl+K, "/") starts empty.
+  function openSearch() {
+    setSearchReturn(null);
+    setSearching(true);
   }
 
   function lookItem(e, item) {
@@ -522,7 +532,7 @@ export default function Dashboard({
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2 xl:ml-auto">
-          <SearchButton onClick={() => setSearching(true)} />
+          <SearchButton onClick={openSearch} />
           <WhatsNew whatsNew={whatsNew} now={now} courseFor={courseFor} onOpen={openChange} />
           {/* Icon only (sun / moon) so the top bar still fits on one row with Search and What's new. */}
           <button
@@ -789,8 +799,10 @@ export default function Dashboard({
 
       <SearchPalette
         open={searching}
-        onOpen={() => setSearching(true)}
+        onOpen={openSearch}
         onClose={() => setSearching(false)}
+        restore={searchReturn}
+        onPicked={setSearchReturn}
         courses={courses}
         items={items}
         status={status}
@@ -817,9 +829,14 @@ export default function Dashboard({
           }}
           onDismiss={() => {
             setLook(null);
+            setSearchReturn(null);
             dismissAnnouncements([look.announcement]);
           }}
-          onClose={() => setLook(null)}
+          onClose={(reason) => {
+            setLook(null);
+            if (reason === "dismiss" && searchReturn) setSearching(true);
+            else setSearchReturn(null);
+          }}
         />
       )}
       {managing && (

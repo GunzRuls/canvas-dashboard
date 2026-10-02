@@ -81,7 +81,8 @@ export function GoalPill({ goal, status, loading, open, onToggle, controls, cour
   }
   const tone = status ? TONES[status.tone] : TONES.plain;
   const label = status ? status.label : `Goal ${fmt(goal)}%`;
-  const detail = status ? `Goal ${fmt(goal)}%: ${status.detail}` : loading ? `Goal ${fmt(goal)}%: checking…` : `Goal ${fmt(goal)}%`;
+  // status.detail is a full sentence that names the goal (lib/gradeGoals.js).
+  const detail = status ? status.detail : loading ? `Goal ${fmt(goal)}%: checking…` : `Goal ${fmt(goal)}%.`;
   return (
     <button
       onClick={onToggle}
