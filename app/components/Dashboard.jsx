@@ -524,9 +524,15 @@ export default function Dashboard({
         <div className="flex flex-wrap items-center gap-2 xl:ml-auto">
           <SearchButton onClick={() => setSearching(true)} />
           <WhatsNew whatsNew={whatsNew} now={now} courseFor={courseFor} onOpen={openChange} />
-          <TopButton onClick={toggleTheme} label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
-            {theme === "dark" ? "Light mode" : "Dark mode"}
-          </TopButton>
+          {/* Icon only (sun / moon) so the top bar still fits on one row with Search and What's new. */}
+          <button
+            onClick={toggleTheme}
+            aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            title={theme === "dark" ? "Light mode" : "Dark mode"}
+            className="btn btn-secondary h-[38px] w-[38px] px-0"
+          >
+            {theme === "dark" ? SunIcon : MoonIcon}
+          </button>
           <TopButton onClick={() => setManaging(true)}>Manage classes</TopButton>
           {/* Opens Settings as a pop-up over the dashboard (app/@modal/(.)setup). */}
           <Link href="/setup" scroll={false} className="btn btn-secondary h-[38px] px-3.5 text-sm">
@@ -870,6 +876,18 @@ function readSetFrom(items, announcements) {
 }
 
 // ---------- pieces ----------
+
+const SunIcon = (
+  <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+  </svg>
+);
+const MoonIcon = (
+  <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" />
+  </svg>
+);
 
 function TopButton({ children, onClick, disabled, strong, label }) {
   return (

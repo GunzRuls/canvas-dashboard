@@ -553,3 +553,5 @@ a.headsup-chip-news:hover { background: var(--purple-bg); color: var(--purple-fg
   font-family: var(--font-sans); font-size: 10.5px; font-weight: 700; line-height: 1;
 }
 .btn .search-kbd { margin-left: 0.15rem; background: var(--surface-2); }
+/* The top bar button drops its Ctrl K hint below 1600px so the bar stays one row. */
+@media (max-width: 99.99rem) { .btn .search-kbd { display: none; } }
