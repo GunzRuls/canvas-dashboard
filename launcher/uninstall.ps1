@@ -1,7 +1,7 @@
 # Removes the School Dashboard from this PC. Run it through Uninstall.cmd.
 
 $Project = Split-Path -Parent $PSScriptRoot
-$PersonalFiles = @("dashboard-config.json", "dashboard-settings.json", "dashboard-dismissed.json", ".env.local")
+$PersonalFiles = @("dashboard-config.json", "dashboard-settings.json", "dashboard-dismissed.json", "dashboard-changes.json", ".env.local")
 
 function Ask($question) {
     $answer = Read-Host "  $question (Y/N)"

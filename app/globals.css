@@ -499,3 +499,17 @@ details[open] > .fold-summary .fold-chevron {
 .quicklook-content th, .quicklook-content td { border: 1px solid var(--line); padding: 0.35rem 0.6rem; text-align: left; vertical-align: top; }
 .quicklook-content th { background: var(--surface-2); font-weight: 700; }
 .quicklook-content caption { text-align: left; font-weight: 700; padding-bottom: 0.3rem; }
+
+/* DASH-10 What changed: the "What's new" top bar button's count, its pop-up list, and the
+   change line on each row (amber for moved dates, like the card's "Moved" badge). */
+.whatsnew-count {
+  display: inline-grid; place-items: center; min-width: 1.25rem; height: 1.25rem; padding: 0 0.35rem;
+  border-radius: 9999px; background: var(--brand); color: #FFFFFF; font-size: 11px; font-weight: 800;
+  font-variant-numeric: tabular-nums; line-height: 1;
+}
+.whatsnew-panel { width: min(24rem, calc(100vw - 2rem)); max-height: min(32rem, calc(100vh - 6rem)); }
+.whatsnew-dot { width: 0.4rem; height: 0.4rem; border-radius: 9999px; background: var(--brand); }
+.whatsnew-change { color: var(--ink-soft); font-weight: 600; }
+.whatsnew-moved { color: var(--amber-fg); }
+.whatsnew-graded { color: var(--green-fg); }
+.whatsnew-removed { color: var(--muted); }

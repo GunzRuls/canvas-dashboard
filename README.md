@@ -41,6 +41,7 @@ Your settings are saved in `%APPDATA%\School Dashboard` and are never uploaded:
 - `dashboard-config.json`: your Canvas address, token, and optional keys
 - `dashboard-settings.json`: class names, colors, hidden classes, class times
 - `dashboard-dismissed.json`: announcements and grades you've cleared
+- `dashboard-changes.json`: what the board looked like last time, for "What's new"
 - `server.log`: details if the dashboard fails to start
 
 ## For developers

@@ -39,6 +39,7 @@ yarn-error.log*
 dashboard-config.json
 dashboard-settings.json
 dashboard-dismissed.json
+dashboard-changes.json
 launcher/server.log
 launcher/email.log
 launcher/port-warning.txt
