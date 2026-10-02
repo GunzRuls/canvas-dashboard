@@ -461,3 +461,41 @@ details[open] > .fold-summary .fold-chevron {
 .week-pop { visibility: hidden; opacity: 0; transform: translateY(-2px); transition: opacity 0.12s, transform 0.12s, visibility 0s linear 0.12s; }
 .week-day:hover .week-pop,
 .week-day:focus-within .week-pop { visibility: visible; opacity: 1; transform: none; transition: opacity 0.12s 0.18s, transform 0.12s 0.18s, visibility 0s linear 0.18s; }
+
+/* Quick look (QuickLook.jsx): the teacher's instructions or message, already cleaned on the
+   server (lib/sanitizeHtml.js), get plain readable typography in the theme's colors. Inline
+   styles are stripped, so Canvas's own colors and sizes never fight the dark theme. */
+.quicklook-content { font-size: 0.9375rem; line-height: 1.6; color: var(--ink); overflow-wrap: anywhere; }
+.quicklook-content > :first-child { margin-top: 0; }
+.quicklook-content > :last-child { margin-bottom: 0; }
+.quicklook-content p, .quicklook-content ul, .quicklook-content ol, .quicklook-content dl,
+.quicklook-content table, .quicklook-content pre, .quicklook-content blockquote, .quicklook-content figure { margin: 0 0 0.75rem; }
+.quicklook-content h3, .quicklook-content h4, .quicklook-content h5, .quicklook-content h6 {
+  margin: 1.1rem 0 0.4rem; font-family: var(--font-display); font-weight: 800; line-height: 1.25; color: var(--ink);
+}
+.quicklook-content h3 { font-size: 1.15rem; }
+.quicklook-content h4 { font-size: 1.02rem; }
+.quicklook-content h5, .quicklook-content h6 { font-size: 0.95rem; }
+.quicklook-content ul { list-style: disc; padding-left: 1.4rem; }
+.quicklook-content ol { list-style: decimal; padding-left: 1.4rem; }
+.quicklook-content li { margin: 0.15rem 0; }
+.quicklook-content li > ul, .quicklook-content li > ol { margin: 0.15rem 0; }
+.quicklook-content dt { font-weight: 700; }
+.quicklook-content dd { margin-left: 1rem; }
+.quicklook-content strong, .quicklook-content b { font-weight: 700; }
+.quicklook-content em, .quicklook-content i { font-style: italic; }
+.quicklook-content u { text-decoration: underline; }
+.quicklook-content small { font-size: 0.85em; }
+.quicklook-content mark { background: var(--amber-bg); color: var(--amber-fg); border-radius: 3px; padding: 0 2px; }
+.quicklook-content a { color: var(--brand-text); text-decoration: underline; text-underline-offset: 2px; transition: color 0.15s; }
+.quicklook-content a:hover { color: var(--ink); }
+.quicklook-content img { max-width: 100%; height: auto; border-radius: 8px; }
+.quicklook-content hr { border: 0; border-top: 1px solid var(--line); margin: 1rem 0; }
+.quicklook-content blockquote { background: var(--surface-2); border-radius: 10px; padding: 0.6rem 0.9rem; color: var(--ink-soft); }
+.quicklook-content code { font-family: ui-monospace, Consolas, monospace; font-size: 0.88em; background: var(--surface-2); border-radius: 5px; padding: 0.05rem 0.3rem; }
+.quicklook-content pre { background: var(--surface-2); border-radius: 10px; padding: 0.75rem 0.9rem; overflow-x: auto; white-space: pre-wrap; }
+.quicklook-content pre code { background: none; padding: 0; }
+.quicklook-content table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; font-size: 0.875rem; }
+.quicklook-content th, .quicklook-content td { border: 1px solid var(--line); padding: 0.35rem 0.6rem; text-align: left; vertical-align: top; }
+.quicklook-content th { background: var(--surface-2); font-weight: 700; }
+.quicklook-content caption { text-align: left; font-weight: 700; padding-bottom: 0.3rem; }

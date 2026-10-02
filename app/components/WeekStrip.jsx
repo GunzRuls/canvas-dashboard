@@ -22,8 +22,9 @@ function onDay(e, key) {
 
 // The next 7 days as one slim row (Layout A): each day shows its first due item (or event) and
 // "+N" for the rest. Hovering a day (or tabbing into it) opens a small list of everything that
-// day, with the same links as before. Narrow windows wrap the days onto 2 or 4 columns.
-export default function WeekStrip({ items, status, events, calendarEnabled, calendarError, now, colorFor, nameFor }) {
+// day. Clicking an item opens Quick look (onLook), like the board. Narrow windows wrap the days
+// onto 2 or 4 columns.
+export default function WeekStrip({ items, status, events, calendarEnabled, calendarError, now, colorFor, nameFor, onLook }) {
   if (!now) return <div className="panel h-[60px] flex-none" />;
 
   const days = Array.from({ length: 7 }, (_, i) => {
@@ -99,6 +100,7 @@ export default function WeekStrip({ items, status, events, calendarEnabled, cale
                     href={first.url || undefined}
                     target="_blank"
                     rel="noreferrer"
+                    onClick={(e) => onLook(e, first)}
                     className="flex min-w-0 items-center gap-1.5 hover:underline"
                     style={{ "--c": colorFor(first.courseId), color: INK }}
                     title={`${nameFor(first.courseId, first.courseName)}: ${first.title}, ${clock(first.dueAt)}`}
@@ -147,6 +149,7 @@ export default function WeekStrip({ items, status, events, calendarEnabled, cale
                         href={it.url || undefined}
                         target="_blank"
                         rel="noreferrer"
+                        onClick={(e) => onLook(e, it)}
                         className="row-hover flex items-start gap-2 rounded-lg px-1.5 py-1 text-xs"
                         style={{ "--c": colorFor(it.courseId) }}
                         title={it.title}

@@ -2,16 +2,45 @@
 
 import { useEffect, useRef, useState } from "react";
 
-// "Sending you to Canvas": the dashboard runs in an app window, so links that open a new tab land
-// in your normal browser with no sign in here. This card confirms where you're going. It listens
+// "Sending you to Canvas": this card confirms where an outside link goes, then opens it in a
+// pop-up window centered over the dashboard (DASH-9) instead of a full browser window. It listens
 // for clicks on any outside link in the whole app and can't be clicked (pointer-events: none).
-// The new window takes focus the moment it opens, which hid the card, so a plain click shows the
-// card first and opens the page when its bar fills (OPEN_MS; the user asked to see it). Ctrl/Shift/
-// middle clicks still open right away.
+// The pop-up takes focus the moment it opens, which would hide the card, so a plain click shows
+// the card first and opens the page when its bar fills (OPEN_MS; the user asked to see it).
+// Ctrl/Shift/Alt/middle clicks still open normally right away, with no card. Clicks another
+// handler already took (Quick look calls preventDefault) are left alone.
 
 const OPEN_MS = 1400; // the bar fills in this time (.redirect-bar in globals.css), then the page opens
 const SHOW_MS = OPEN_MS + 300; // the card stays a moment after the page opens, then fades
 const FADE_MS = 200;
+const POPUP_NAME = "dashboard-peek"; // one named window, so repeated clicks reuse it instead of piling up
+
+// Opens `href` in the pop-up window: about 85% of the dashboard window (at least 900x650, at most
+// the screen), centered over it. It shares the browser's Canvas sign in, so Check in works.
+function openPopup(href) {
+  const scr = window.screen;
+  const width = Math.min(Math.max(900, Math.round(window.outerWidth * 0.85)), scr.availWidth || 9999);
+  const height = Math.min(Math.max(650, Math.round(window.outerHeight * 0.85)), scr.availHeight || 9999);
+  // Centered on the dashboard window, but kept on the screen.
+  const minX = scr.availLeft || 0;
+  const minY = scr.availTop || 0;
+  const clamp = (v, lo, size, avail) => Math.round(Math.min(Math.max(v, lo), lo + Math.max(0, (avail || size) - size)));
+  const left = clamp(window.screenX + (window.outerWidth - width) / 2, minX, width, scr.availWidth);
+  const top = clamp(window.screenY + (window.outerHeight - height) / 2, minY, height, scr.availHeight);
+  // An empty address opens a blank pop-up (or finds the one already open without reloading it).
+  // The blank page is still ours, so its link back to the dashboard (opener) can be cut before
+  // the outside page loads; that page then can't steer the dashboard window.
+  const win = window.open("", POPUP_NAME, `popup,width=${width},height=${height},left=${left},top=${top}`);
+  if (!win) {
+    window.open(href, "_blank", "noopener,noreferrer"); // pop-ups blocked: open it the old way
+    return;
+  }
+  try {
+    win.opener = null;
+  } catch {} // a reused window already shows another site; its link was cut when it first opened
+  win.location.href = href;
+  win.focus();
+}
 
 // Link texts that don't say anything on their own ("Open", "Grades"...).
 const GENERIC = /^(open|open in canvas|grades|check in( now)?|view|link|here)$/i;
@@ -135,7 +164,7 @@ export default function RedirectCard() {
       setGo({ ...info, id: Date.now(), leaving: false });
       timers.current = [
         // Still inside the click's permission window, so the browser allows it.
-        setTimeout(() => window.open(url.href, "_blank", "noopener,noreferrer"), OPEN_MS),
+        setTimeout(() => openPopup(url.href), OPEN_MS),
         setTimeout(() => setGo((g) => g && { ...g, leaving: true }), SHOW_MS),
         setTimeout(() => setGo(null), SHOW_MS + FADE_MS),
       ];
@@ -173,7 +202,7 @@ export default function RedirectCard() {
               <div className="redirect-bar c-dot h-1.5 rounded-full" />
             </div>
             <p className="text-xs" style={{ color: "var(--muted)" }}>
-              Opening in your browser…
+              Opening in a pop-up window over the dashboard…
             </p>
           </div>
         </div>

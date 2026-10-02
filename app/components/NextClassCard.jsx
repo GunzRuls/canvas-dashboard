@@ -136,7 +136,7 @@ const BRAND_FILL = heroColors("#3355FF");
 // thing due for it, and its newest unread announcement. Class times come from Manage classes
 // (or calendar events that mention the class); Canvas itself doesn't have them.
 // The card is filled with the class color so it stands out from the panels around it.
-export default function NextClassCard({ now, courses, sessions, items, status, announcements, readIds, onRead, onAddTimes }) {
+export default function NextClassCard({ now, courses, sessions, items, status, announcements, readIds, onLookItem, onLookAnnouncement, onAddTimes }) {
   if (!now) return <div className="panel min-h-[124px]" />;
 
   const card = nextClassCard({ courses, sessions, items, status, announcements, readIds, now });
@@ -235,6 +235,7 @@ export default function NextClassCard({ now, courses, sessions, items, status, a
           {card.urgent && (
             <Row
               href={card.urgent.url}
+              onClick={(e) => onLookItem(e, card.urgent)}
               icon={ClockIcon}
               tile={TILES[due.tone]}
               title={card.urgent.title}
@@ -245,7 +246,7 @@ export default function NextClassCard({ now, courses, sessions, items, status, a
           {card.announcement && (
             <Row
               href={card.announcement.url}
-              onClick={() => onRead(card.announcement)}
+              onClick={(e) => onLookAnnouncement(e, card.announcement)}
               icon={MegaphoneIcon}
               tile="hero-glass"
               title={card.announcement.title}

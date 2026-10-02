@@ -11,6 +11,7 @@ import EmptyState from "./EmptyState";
 import UpdateNotice from "./UpdateNotice";
 import AccountChip from "./AccountChip";
 import NextClassCard from "./NextClassCard";
+import QuickLook from "./QuickLook";
 import { displayCode } from "@/lib/courseNames";
 
 const INK = "var(--ink)";
@@ -32,6 +33,9 @@ const TYPE_LABELS = {
   planner_note: "Note",
   assessment_request: "Peer review",
 };
+
+// Kinds of board items Quick look can show. Others (pages, peer reviews) open in the pop-up window.
+const LOOK_TYPES = new Set(["assignment", "quiz", "discussion_topic"]);
 
 // ---------- date helpers (only run in the browser, so times use your timezone) ----------
 
@@ -140,6 +144,7 @@ export default function Dashboard({
   const [dismissedIds, setDismissedIds] = useState(new Set());
   const [seenGradeKeys, setSeenGradeKeys] = useState(new Set());
   const [theme, setTheme] = useState(null); // "light" | "dark", read after load
+  const [look, setLook] = useState(null); // the Quick look pop-up's item, see openLook
 
   const refresh = () => startRefresh(() => router.refresh());
 
@@ -439,6 +444,33 @@ export default function Dashboard({
     }
   }
 
+  // Quick look: a plain click on an assignment, quiz, discussion or announcement opens it inside
+  // the dashboard. Ctrl/Shift/Alt/middle clicks aren't stopped, so they go straight to Canvas.
+  function openLook(e, target) {
+    if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    e.preventDefault(); // also tells RedirectCard to leave this click alone
+    setLook(target);
+  }
+
+  function lookItem(e, item) {
+    if (!LOOK_TYPES.has(item.type) || !item.courseId) return; // opens in the pop-up window instead
+    openLook(e, {
+      kind: "item",
+      key: item.key,
+      type: item.type,
+      courseId: item.courseId,
+      id: item.plannableId,
+      title: item.title,
+      url: item.url,
+    });
+  }
+
+  // Opening an announcement (either way) marks it read, as clicking it always has.
+  function lookAnnouncement(e, a) {
+    markRead(a);
+    openLook(e, { kind: "announcement", type: "announcement", courseId: a.courseId, id: a.id, title: a.title, url: a.url, announcement: a });
+  }
+
   const today = now
     ? new Date(now).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })
     : "\u00A0";
@@ -504,7 +536,8 @@ export default function Dashboard({
               status={status}
               announcements={announcements.filter((a) => !dismissedIds.has(a.id))}
               readIds={readIds}
-              onRead={markRead}
+              onLookItem={lookItem}
+              onLookAnnouncement={lookAnnouncement}
               onAddTimes={() => setManaging(true)}
             />
           </div>
@@ -554,6 +587,7 @@ export default function Dashboard({
             now={now}
             colorFor={colorFor}
             nameFor={nameFor}
+            onLook={lookItem}
           />
 
       <div className="grid grid-cols-1 gap-5 xl:min-h-[300px] xl:flex-1 xl:grid-cols-[minmax(0,1fr)_260px] xl:grid-rows-1 xl:gap-4 min-[90rem]:grid-cols-[minmax(0,1fr)_300px]">
@@ -636,7 +670,9 @@ export default function Dashboard({
                         courseName={nameFor(item.courseId, item.courseName)}
                         courseCode={codeFor(item.courseId)}
                         readIds={readIds}
-                        onOpenAnnouncement={markRead}
+                        dismissedIds={dismissedIds}
+                        onLook={(e) => lookItem(e, item)}
+                        onLookAnnouncement={lookAnnouncement}
                         syncing={syncing.has(item.key)}
                         dragging={dragKey === item.key}
                         onDragStart={() => setDragKey(item.key)}
@@ -694,6 +730,7 @@ export default function Dashboard({
                     courseName={nameFor(a.courseId)}
                     courseCode={codeFor(a.courseId)}
                     onRead={() => markRead(a)}
+                    onLook={(e) => lookAnnouncement(e, a)}
                     onDone={() => dismissAnnouncements([a])}
                   />
                 )}
@@ -706,6 +743,24 @@ export default function Dashboard({
       </div>
 
       {whatIfCourse &&<WhatIfPanel course={whatIfCourse} onClose={() => setWhatIfCourse(null)} />}
+      {look && (
+        <QuickLook
+          key={`${look.type}-${look.id}`}
+          target={look}
+          course={{ color: colorFor(look.courseId), name: nameFor(look.courseId, items.find((i) => i.key === look.key)?.courseName), code: codeFor(look.courseId) }}
+          now={now}
+          boardStatus={look.kind === "item" ? status[look.key] : undefined}
+          onMove={(to) => {
+            const item = items.find((i) => i.key === look.key);
+            if (item) moveItem(item, to);
+          }}
+          onDismiss={() => {
+            setLook(null);
+            dismissAnnouncements([look.announcement]);
+          }}
+          onClose={() => setLook(null)}
+        />
+      )}
       {managing && (
         <ManageClasses
           allCourses={allCourses}
@@ -1054,7 +1109,9 @@ function TaskCard({
   courseName,
   courseCode,
   readIds,
-  onOpenAnnouncement,
+  dismissedIds,
+  onLook,
+  onLookAnnouncement,
   syncing,
   dragging,
   onDragStart,
@@ -1073,6 +1130,7 @@ function TaskCard({
   ];
   const kind = `${TYPE_LABELS[item.type] || "Item"}${item.points ? `, ${item.points} pts` : ""}`;
   const titleStyle = { color: INK, textDecoration: done ? "line-through" : undefined };
+  const linked = (item.announcements || []).filter((a) => !dismissedIds.has(a.id));
 
   // Compact card (Layout A): class + due on one line, the title on one line (full title on hover),
   // then date, status badges and the actions on the last line, so a column shows ~5 cards.
@@ -1106,6 +1164,7 @@ function TaskCard({
           href={item.url}
           target="_blank"
           rel="noreferrer"
+          onClick={onLook}
           className="truncate text-sm font-bold leading-snug hover:underline"
           style={titleStyle}
           title={item.title}
@@ -1118,15 +1177,15 @@ function TaskCard({
         </p>
       )}
 
-      {item.announcements?.length > 0 && (
+      {linked.length > 0 && (
         <div className="flex flex-col gap-1">
-          {item.announcements.map((a) => (
+          {linked.map((a) => (
             <a
               key={a.id}
               href={a.url}
               target="_blank"
               rel="noreferrer"
-              onClick={() => onOpenAnnouncement(a)}
+              onClick={(e) => onLookAnnouncement(e, a)}
               className="flex items-center gap-1.5 rounded-md bg-[var(--purple-bg)] px-1.5 py-0.5 text-[11px] font-bold hover:underline"
               style={{ color: "var(--purple-fg)" }}
               title={a.title}
@@ -1210,7 +1269,7 @@ function CourseCode({ code }) {
   );
 }
 
-function AnnouncementCard({ announcement: a, now, unread, color, courseName, courseCode, onRead, onDone }) {
+function AnnouncementCard({ announcement: a, now, unread, color, courseName, courseCode, onRead, onLook, onDone }) {
   return (
     <article className="row-hover px-4 py-3" style={{ "--c": color, opacity: unread ? 1 : 0.72 }}>
       <div className="flex items-center justify-between gap-2 text-xs">
@@ -1227,7 +1286,7 @@ function AnnouncementCard({ announcement: a, now, unread, color, courseName, cou
         href={a.url}
         target="_blank"
         rel="noreferrer"
-        onClick={onRead}
+        onClick={onLook}
         className="mt-1 flex items-start gap-1.5 text-sm font-bold leading-snug hover:underline"
         style={{ color: INK }}
       >
