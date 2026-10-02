@@ -148,7 +148,8 @@ export default function RedirectCard() {
       // Bubble phase on window, so a click another handler cancelled is ignored.
       if (e.defaultPrevented || e.button !== 0) return;
       const link = e.target instanceof Element ? e.target.closest("a[href]") : null;
-      if (!link || link.target !== "_blank") return;
+      // data-no-redirect: links that should just do their own thing (Quick look's Download).
+      if (!link || link.target !== "_blank" || link.hasAttribute("data-no-redirect")) return;
       let url;
       try {
         url = new URL(link.href);

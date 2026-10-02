@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { formatSize } from "@/lib/canvasFiles";
 
 // Quick look (DASH-9): a pop-up inside the dashboard that shows one assignment, quiz, discussion
 // or announcement: when it's due, points, your submission, the full instructions and files.
@@ -171,11 +172,87 @@ function Skeleton() {
   );
 }
 
-const PaperclipIcon = (
-  <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 11.5l-8.5 8.5a5 5 0 0 1-7-7L14 4.5a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 7.5" />
+const DownloadIcon = (
+  <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 4v11M7 10.5l5 5 5-5M5 20h14" />
   </svg>
 );
+
+// A small page icon with the file type's short label, tinted per type.
+const KINDS = {
+  pdf: { label: "PDF", bg: "var(--red-bg)", fg: "var(--red-fg)" },
+  doc: { label: "DOC", bg: "var(--blue-bg)", fg: "var(--blue-fg)" },
+  slides: { label: "PPT", bg: "var(--orange-bg)", fg: "var(--orange-fg)" },
+  sheet: { label: "XLS", bg: "var(--green-bg)", fg: "var(--green-fg)" },
+  image: { label: "IMG", bg: "var(--amber-bg)", fg: "var(--amber-fg)" },
+  video: { label: "MEDIA", bg: "var(--chip)", fg: "var(--ink-soft)" },
+  zip: { label: "ZIP", bg: "var(--chip)", fg: "var(--ink-soft)" },
+  other: { label: "FILE", bg: "var(--chip)", fg: "var(--ink-soft)" },
+};
+
+function FileIcon({ kind }) {
+  const k = KINDS[kind] || KINDS.other;
+  return (
+    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg" style={{ background: k.bg, color: k.fg }} aria-hidden="true">
+      <span className="flex flex-col items-center leading-none">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+          <path d="M14 3v5h5" />
+        </svg>
+        <span className="mt-0.5 text-[7.5px] font-extrabold tracking-wide">{k.label}</span>
+      </span>
+    </span>
+  );
+}
+
+// Files from the instructions/message and attachments. Open = the file's Canvas page in the pop-up
+// window (a normal outside link, so RedirectCard handles it). Download = Canvas's download address
+// as a plain same-window link: Canvas answers it with "save as a file", so the browser downloads it
+// and the dashboard stays put. It has no target, and data-no-redirect, so RedirectCard skips it.
+function FileList({ files }) {
+  return (
+    <section aria-label="Files">
+      <p className="mb-1.5 text-[11px] font-extrabold uppercase tracking-wide" style={{ color: MUTED }}>
+        Files <span className="font-bold normal-case tracking-normal">· {files.length}</span>
+      </p>
+      <ul className="flex flex-col divide-y divide-[var(--line)] overflow-hidden rounded-2xl bg-[var(--surface)]" style={{ boxShadow: "inset 0 0 0 1px var(--line)" }}>
+        {files.map((f) => {
+          const size = formatSize(f.size);
+          return (
+            <li key={f.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-2.5">
+              <div className="flex min-w-0 flex-1 basis-[220px] items-center gap-3">
+                <FileIcon kind={f.kind} />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold" style={{ color: INK }} title={f.name}>
+                    {f.name}
+                  </p>
+                  <p className="text-xs font-semibold" style={{ color: MUTED }}>
+                    {[KINDS[f.kind]?.label === "FILE" ? "" : KINDS[f.kind]?.label, size].filter(Boolean).join(" · ") ||
+                      (f.downloadUrl ? "File" : "Open it in Canvas to see it")}
+                  </p>
+                </div>
+              </div>
+              <div className="ml-auto flex shrink-0 items-center gap-1.5">
+                {f.openUrl && (
+                  <a href={f.openUrl} target="_blank" rel="noreferrer" className="btn btn-secondary h-8 px-3 text-[13px]" title={`Open ${f.name} in Canvas`}>
+                    Open
+                  </a>
+                )}
+                {f.downloadUrl && (
+                  <a href={f.downloadUrl} download={f.name} data-no-redirect="" rel="noreferrer" className="btn btn-soft h-8 px-3 text-[13px]" title={`Download ${f.name}`}>
+                    {DownloadIcon}
+                    Download
+                  </a>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 const ArrowIcon = (
   <svg aria-hidden="true" viewBox="0 0 12 12" className="h-3 w-3">
     <path d="M3.5 2.5h6v6M9.5 2.5 2.5 9.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
@@ -365,30 +442,7 @@ export default function QuickLook({ target, course, now, boardStatus, onMove, on
                   </section>
                 )}
 
-                {look.files?.length > 0 && (
-                  <section aria-label="Files">
-                    <p className="mb-1.5 text-[11px] font-extrabold uppercase tracking-wide" style={{ color: MUTED }}>
-                      Files
-                    </p>
-                    <ul className="flex flex-wrap gap-1.5">
-                      {look.files.map((f) => (
-                        <li key={f.url}>
-                          <a
-                            href={f.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex max-w-[300px] items-center gap-1.5 rounded-lg bg-[var(--surface)] px-2.5 py-1.5 text-[13px] font-bold shadow-[inset_0_0_0_1px_var(--line)] transition-shadow hover:shadow-[inset_0_0_0_1.5px_var(--c)]"
-                            style={{ color: INK }}
-                            title={f.name}
-                          >
-                            <span className="c-text shrink-0">{PaperclipIcon}</span>
-                            <span className="truncate">{f.name}</span>
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  </section>
-                )}
+                {look.files?.length > 0 && <FileList files={look.files} />}
               </div>
             )}
           </div>
