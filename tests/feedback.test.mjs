@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { feedbackFromSubmissions, fromStaff, unseenCount, scoreText, plainComment, newestFirst } from "../lib/feedback.js";
+import { feedbackFromSubmissions, fromStaff, unseenCount, scoreText, plainComment, newestFirst, withoutDone, feedbackView } from "../lib/feedback.js";
 
 // Teacher feedback (CLASS-7): which comments count, the 30-day window, order and the new count.
 
@@ -91,4 +91,21 @@ test("score text", () => {
   assert.equal(scoreText({ score: 1, points: 1, grade: "complete" }), "Complete");
   assert.equal(scoreText({ score: 9.5, points: null, grade: "9.5" }), "9.5");
   assert.equal(scoreText({ score: null, points: 10, grade: null }), "");
+});
+
+test("Done comments leave the Feedback tab and its count; all Done means caught up", () => {
+  const list = [{ id: "1" }, { id: "2" }, { id: "3" }];
+  assert.deepEqual(withoutDone(list, new Set(["2"])).map((f) => f.id), ["1", "3"]);
+  assert.deepEqual(withoutDone(null, new Set()), []);
+  // A Done comment that was new doesn't count as new any more.
+  const v = feedbackView(list, { seen: new Set(["1"]), done: new Set(["3"]) });
+  assert.deepEqual(v.shown.map((f) => f.id), ["1", "2"]);
+  assert.equal(v.unseen, 1);
+  assert.equal(v.allDone, false);
+  // Number ids are matched as strings.
+  assert.equal(feedbackView([{ id: 4 }], { seen: new Set(), done: new Set(["4"]) }).shown.length, 0);
+  const all = feedbackView(list, { seen: new Set(), done: new Set(["1", "2", "3"]) });
+  assert.deepEqual(all, { shown: [], unseen: 0, allDone: true });
+  // No comments at all is the plain empty state, not "caught up".
+  assert.equal(feedbackView([], { seen: new Set(), done: new Set() }).allDone, false);
 });

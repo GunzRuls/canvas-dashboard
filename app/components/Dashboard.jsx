@@ -810,6 +810,7 @@ export default function Dashboard({
           onLookItem={lookItem}
           onLookAnnouncement={lookAnnouncement}
           onLookFeedback={lookFeedback}
+          onToast={setToast}
           newsCount={visibleAnnouncements.length}
           clearAll={clearAll}
           news={

@@ -39,7 +39,7 @@ const settings = {
   schedule: { 1: { days: [1, 3], start: "09:00", end: "09:50" } },
   goals: { 1: 90 },
 };
-const dismissed = { announcements: [11, 12], grades: ["7:2026-10-01T00:00:00Z"] };
+const dismissed = { announcements: [11, 12], grades: ["7:2026-10-01T00:00:00Z"], feedback: ["501", "502"], feedbackDone: ["502"] };
 const PASSWORD = "correct horse battery";
 
 const payload = buildBackupPayload({ config, settings, dismissed });
@@ -129,12 +129,14 @@ test("the payload holds only the listed fields, whatever else the inputs carry",
   assert.deepEqual(Object.keys(built.config).sort(), [...BACKUP_CONFIG_KEYS].sort());
   assert.deepEqual(Object.keys(built.settings).sort(), ["attendance", "colors", "goals", "hidden", "names", "schedule"]);
   assert.deepEqual(built.settings.attendance, {}); // the settings rules still apply
-  assert.deepEqual(Object.keys(built.dismissed).sort(), ["announcements", "grades"]);
+  assert.deepEqual(Object.keys(built.dismissed).sort(), ["announcements", "feedback", "feedbackDone", "grades"]);
+  assert.deepEqual(built.dismissed.feedback, ["501", "502"]);
+  assert.deepEqual(built.dismissed.feedbackDone, ["502"]);
   assert.equal(built.config.canvasToken, config.canvasToken);
   // Missing pieces become empty, not undefined.
   const empty = buildBackupPayload({});
   assert.equal(empty.config.canvasToken, "");
-  assert.deepEqual(empty.dismissed, { announcements: [], grades: [] });
+  assert.deepEqual(empty.dismissed, { announcements: [], grades: [], feedback: [], feedbackDone: [] });
 });
 
 test("an opened file goes through the same filter (a hand-made payload can't add fields)", async () => {
@@ -153,4 +155,18 @@ test("passwords need at least 8 characters, and the file name has the date", asy
   assert.equal(backupFileName(new Date("2026-10-03T02:00:00Z"), "America/New_York"), "school-dashboard-backup-2026-10-02.sdbackup");
   assert.equal(backupFileName(new Date("2026-10-03T12:00:00Z"), "Not/AZone"), "school-dashboard-backup-2026-10-03.sdbackup");
   assert.equal(KDF.N, 2 ** 15);
+});
+
+test("cleared teacher comments travel in the backup; only Canvas comment ids are kept", async () => {
+  const file = await encryptBackup(
+    { config, settings, dismissed: { ...dismissed, feedbackDone: ["502", 503, "<script>", "", "9".repeat(21)] } },
+    PASSWORD
+  );
+  const { payload: opened } = await decryptBackup(file, PASSWORD);
+  assert.deepEqual(opened.dismissed.feedback, ["501", "502"]);
+  assert.deepEqual(opened.dismissed.feedbackDone, ["502", "503"]);
+  // A backup made before this list existed opens with empty lists.
+  const old = await encryptBackup({ config, settings, dismissed: { announcements: [1], grades: [] } }, PASSWORD);
+  const { payload: oldOpened } = await decryptBackup(old, PASSWORD);
+  assert.deepEqual(oldOpened.dismissed.feedbackDone, []);
 });

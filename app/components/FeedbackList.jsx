@@ -6,7 +6,8 @@ import { displayCode } from "@/lib/courseNames";
 import { scoreText } from "@/lib/feedback";
 
 // Incoming's Feedback tab (CLASS-7): comments teachers left on your graded work in the last 30
-// days, newest first. The assignment title opens Quick look; a long comment opens up on click.
+// days, newest first. The assignment title opens Quick look; a long comment opens up on click;
+// Done hides a comment from this tab (Quick look still lists it with its assignment).
 
 const INK = "var(--ink)";
 const MUTED = "var(--muted)";
@@ -37,7 +38,7 @@ function Loading() {
 }
 
 // `list` is null while loading; IncomingPanel has already left out hidden or filtered-out classes.
-export default function FeedbackList({ list, error, courses, now, newIds, onLook, onRetry }) {
+export default function FeedbackList({ list, error, courses, now, newIds, allDone, onLook, onDone, onRetry }) {
   if (error) {
     return (
       <div className="panel flex flex-col items-start gap-2 px-4 py-4 text-sm" role="status">
@@ -50,19 +51,29 @@ export default function FeedbackList({ list, error, courses, now, newIds, onLook
     );
   }
   if (!list) return <Loading />;
-  if (!list.length) return <EmptyState kind="feedback" />;
+  if (!list.length) {
+    return allDone ? (
+      <EmptyState
+        kind="feedback"
+        title="You're all caught up on teacher comments"
+        text="Comments you marked Done still show in Quick look with their assignment. New ones will show up here."
+      />
+    ) : (
+      <EmptyState kind="feedback" />
+    );
+  }
   const courseById = Object.fromEntries(courses.map((c) => [String(c.id), c]));
 
   return (
     <div className="panel flex flex-col overflow-hidden">
       {list.map((f) => (
-        <FeedbackRow key={f.id} f={f} course={courseById[String(f.courseId)]} now={now} isNew={newIds.has(f.id)} onLook={onLook} />
+        <FeedbackRow key={f.id} f={f} course={courseById[String(f.courseId)]} now={now} isNew={newIds.has(f.id)} onLook={onLook} onDone={() => onDone(f)} />
       ))}
     </div>
   );
 }
 
-function FeedbackRow({ f, course, now, isNew, onLook }) {
+function FeedbackRow({ f, course, now, isNew, onLook, onDone }) {
   const [open, setOpen] = useState(false);
   const code = displayCode(course);
   const score = scoreText(f);
@@ -132,10 +143,16 @@ function FeedbackRow({ f, course, now, isNew, onLook }) {
           )}
         </p>
       )}
-      <p className="truncate text-xs" style={{ color: MUTED }}>
-        — {f.authorName}
-        {now ? ` · ${timeAgo(f.createdAt, now)}` : ""}
-      </p>
+      {/* Same footer as a News row: who and when, then Done. */}
+      <div className="mt-0.5 flex items-center justify-between gap-2 text-xs">
+        <span className="truncate" style={{ color: MUTED }}>
+          — {f.authorName}
+          {now ? ` · ${timeAgo(f.createdAt, now)}` : ""}
+        </span>
+        <button onClick={onDone} className="btn btn-course h-[26px] shrink-0 rounded-lg px-2.5 text-xs" title="Hide this comment here (nothing changes in Canvas)">
+          Done
+        </button>
+      </div>
     </article>
   );
 }

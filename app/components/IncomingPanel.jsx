@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import HeadsUp from "./HeadsUp";
 import FeedbackList from "./FeedbackList";
+import { feedbackView } from "@/lib/feedback";
 
 const INK = "var(--ink)";
 const MUTED = "var(--muted)";
@@ -27,12 +28,14 @@ function savedPick(now) {
 // Incoming (DASH-15), Today's right column: a switch between Heads up (exams and workload), News
 // (announcements) and Feedback (teacher comments, CLASS-7). It opens on Heads up when an exam is
 // 3 days away or closer, otherwise on News (new feedback doesn't take over); once you pick one,
-// that pick stays for the rest of the day.
-export default function IncomingPanel({ now, headsUp, courses, filter, onLookItem, onLookAnnouncement, onLookFeedback, newsCount, news, clearAll }) {
+// that pick stays for the rest of the day. Feedback rows have Done and the header Clear all, like
+// News: they hide comments from this tab (on this PC only) with an Undo toast (`onToast`).
+export default function IncomingPanel({ now, headsUp, courses, filter, onLookItem, onLookAnnouncement, onLookFeedback, onToast, newsCount, news, clearAll }) {
   const [picked, setPicked] = useState(null); // { day, seg } picked in this window
   // Teacher comments, asked for after the page has loaded so they never slow it down.
   const [feedback, setFeedback] = useState({ list: null, error: null, at: 0 });
   const [seen, setSeen] = useState(new Set()); // comment ids already viewed (saved on the server)
+  const [done, setDone] = useState(new Set()); // comment ids you marked Done (saved on the server)
   const [fresh, setFresh] = useState(new Set()); // new when you opened the tab: their dots stay while you read
   const loading = useRef(false);
   const segRef = useRef(null);
@@ -46,7 +49,9 @@ export default function IncomingPanel({ now, headsUp, courses, filter, onLookIte
 
   const courseIds = new Set(courses.map((c) => String(c.id)));
   const shown = (list) => list.filter((f) => courseIds.has(String(f.courseId)) && (!filter || String(f.courseId) === String(filter)));
-  const feedbackList = feedback.list ? shown(feedback.list) : null;
+  // Done comments are left out of the list and the count; when all of them are, it says you're caught up.
+  const view = feedback.list ? feedbackView(shown(feedback.list), { seen, done }) : null;
+  const feedbackList = view ? view.shown : null;
   const unseen = (feedbackList || []).filter((f) => !seen.has(f.id));
 
   // Viewing Feedback marks what's in it as seen (on this PC only; nothing changes in Canvas).
@@ -71,6 +76,7 @@ export default function IncomingPanel({ now, headsUp, courses, filter, onLookIte
         if (!data.ok) throw new Error(data.error);
         const seenIds = new Set(data.seen);
         setFeedback({ list: data.feedback, error: null, at: Date.now() });
+        setDone(new Set(data.done || []));
         setSeen((s) => new Set([...s, ...seenIds]));
         // Already looking at the Feedback tab: what just arrived counts as seen.
         if (segRef.current === "feedback") markSeen(data.feedback.filter((f) => !seenIds.has(f.id)).map((f) => f.id));
@@ -84,6 +90,53 @@ export default function IncomingPanel({ now, headsUp, courses, filter, onLookIte
   useEffect(() => {
     loadFeedback();
   }, [loadFeedback]);
+
+  // Done / Clear all: hides comments from this tab (Undo for 7 seconds). Nothing changes in Canvas.
+  function setDoneIds(ids, on) {
+    setDone((d) => {
+      const next = new Set(d);
+      for (const id of ids) on ? next.add(id) : next.delete(id);
+      return next;
+    });
+  }
+
+  async function sendDone(ids, dismiss) {
+    const res = await fetch("/api/feedback/dismiss", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids, dismiss }),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+  }
+
+  async function clearFeedback(list) {
+    const ids = list.map((f) => f.id);
+    if (!ids.length) return;
+    setDoneIds(ids, true);
+    try {
+      await sendDone(ids, true);
+      onToast({
+        tone: "ok",
+        text: ids.length === 1 ? "Comment cleared" : `${ids.length} comments cleared`,
+        action: { label: "Undo", onClick: () => undoClear(ids) },
+      });
+    } catch (error) {
+      setDoneIds(ids, false);
+      onToast({ tone: "error", text: `That didn't save. ${error.message}` });
+    }
+  }
+
+  async function undoClear(ids) {
+    onToast(null);
+    setDoneIds(ids, false);
+    try {
+      await sendDone(ids, false);
+    } catch (error) {
+      setDoneIds(ids, true);
+      onToast({ tone: "error", text: `Undo didn't save. ${error.message}` });
+    }
+  }
 
   function pick(next) {
     setPicked({ day: today, seg: next });
@@ -121,7 +174,16 @@ export default function IncomingPanel({ now, headsUp, courses, filter, onLookIte
           Incoming
         </h2>
         {seg === "news" && clearAll}
-        {(seg === "heads" || seg === "feedback") && (
+        {seg === "feedback" && feedbackList?.length > 0 && (
+          <button
+            onClick={() => clearFeedback(feedbackList)}
+            className="text-link shrink-0 text-xs font-bold underline"
+            style={{ color: INK }}
+          >
+            Clear {filter ? "these" : "all"} ({feedbackList.length})
+          </button>
+        )}
+        {(seg === "heads" || (seg === "feedback" && !feedbackList?.length)) && (
           <span className="shrink-0 text-xs font-semibold" style={{ color: MUTED }}>
             {seg === "heads" ? "Next 3 weeks" : "Last 30 days"}
           </span>
@@ -166,7 +228,9 @@ export default function IncomingPanel({ now, headsUp, courses, filter, onLookIte
             courses={courses}
             now={now}
             newIds={fresh}
+            allDone={view?.allDone}
             onLook={onLookFeedback}
+            onDone={(f) => clearFeedback([f])}
             onRetry={loadFeedback}
           />
         )}
