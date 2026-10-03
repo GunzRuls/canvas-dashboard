@@ -459,15 +459,6 @@ details[open] > .fold-summary .fold-chevron {
 .empty-confetti { animation: empty-confetti 3.2s ease-in-out infinite; transform-box: fill-box; }
 @media (prefers-reduced-motion: reduce) { .empty-confetti { animation: none; } }
 
-/* Today's slim 7-day strip (WeekStrip.jsx): a day lights up on hover, and after a short pause
-   its full list drops down under it (also while a link inside has keyboard focus). The pause keeps
-   the lists from flashing open while the mouse just passes over the strip. */
-.week-day { transition: background-color 0.15s; }
-.week-day:hover { background: var(--hover); }
-.week-pop { visibility: hidden; opacity: 0; transform: translateY(-2px); transition: opacity 0.12s, transform 0.12s, visibility 0s linear 0.12s; }
-.week-day:hover .week-pop,
-.week-day:focus-within .week-pop { visibility: visible; opacity: 1; transform: none; transition: opacity 0.12s 0.18s, transform 0.12s 0.18s, visibility 0s linear 0.18s; }
-
 /* Quick look (QuickLook.jsx): the teacher's instructions or message, already cleaned on the
    server (lib/sanitizeHtml.js), get plain readable typography in the theme's colors. Inline
    styles are stripped, so Canvas's own colors and sizes never fight the dark theme. */

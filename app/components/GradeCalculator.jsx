@@ -283,15 +283,18 @@ export default function GradeCalculator({ course, goal = null, onClose }) {
           style={{ "--c": course.color, color: "var(--ink)" }}
         >
           {/* Header */}
-          <header className="flex h-[72px] shrink-0 items-center gap-4 border-b border-[var(--line)] pl-5 pr-4 sm:pl-7">
+          <header className="flex min-h-[72px] shrink-0 items-center gap-4 border-b border-[var(--line)] py-2.5 pl-5 pr-4 sm:pl-7">
             <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
               <h2 id="calc-title" className="font-display text-[21px] font-extrabold leading-tight tracking-[-0.3px]">
                 Grade calculator
               </h2>
-              <span className="flex min-w-0 items-center gap-[7px] whitespace-nowrap text-[13px] font-semibold" style={{ color: SOFT }}>
-                <span className="c-dot h-[9px] w-[9px] shrink-0 rounded-full" aria-hidden="true" />
-                <span className="truncate">{course.name}</span>
-                {course.code && <span style={{ color: MUTED }}>{course.code}</span>}
+              {/* Long class names wrap instead of being cut off. */}
+              <span className="flex min-w-0 items-baseline gap-[7px] text-[13px] font-semibold leading-snug" style={{ color: SOFT }}>
+                <span className="c-dot h-[9px] w-[9px] shrink-0 translate-y-[-1px] rounded-full" aria-hidden="true" />
+                <span className="min-w-0">
+                  {course.name}
+                  {course.code && <span className="ml-1.5 whitespace-nowrap" style={{ color: MUTED }}>{course.code}</span>}
+                </span>
               </span>
             </div>
             <div className="hidden shrink-0 items-baseline gap-2 pr-2 sm:flex">
@@ -310,9 +313,9 @@ export default function GradeCalculator({ course, goal = null, onClose }) {
               onClick={() => (help ? closeHelp() : setHelp(true))}
               aria-expanded={help}
               aria-controls="calc-help"
-              className="btn btn-soft h-9 shrink-0 rounded-full px-3 text-[13px]"
+              className="btn btn-soft h-8 shrink-0 rounded-full px-2.5 text-[12.5px]"
             >
-              <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="9" />
                 <path d="M9.5 9.5a2.5 2.5 0 0 1 4.9.6c0 1.7-2.4 2.2-2.4 3.6M12 17h.01" />
               </svg>
@@ -360,9 +363,9 @@ export default function GradeCalculator({ course, goal = null, onClose }) {
                     {letters.map((l) => {
                       const on = tValid && Math.abs(tNum - l.value) < 1e-9;
                       return (
-                        <button key={l.label} onClick={() => pickTarget(l.value)} aria-pressed={on} className="calc-goal flex h-[58px] flex-col items-center justify-center gap-px rounded-[14px]">
-                          <span className="font-display text-lg font-extrabold leading-none">{l.label}</span>
-                          <span className="text-[11.5px] font-semibold tabular-nums opacity-80">{trim(l.value)}%</span>
+                        <button key={l.label} onClick={() => pickTarget(l.value)} aria-pressed={on} className="calc-goal flex h-[50px] flex-col items-center justify-center gap-px rounded-[12px]">
+                          <span className="font-display text-base font-extrabold leading-none">{l.label}</span>
+                          <span className="text-[11px] font-semibold tabular-nums opacity-80">{trim(l.value)}%</span>
                         </button>
                       );
                     })}
@@ -410,7 +413,7 @@ export default function GradeCalculator({ course, goal = null, onClose }) {
                     </p>
                   </div>
                   {ans.fix && (
-                    <button onClick={() => pickTarget(ans.fix.value)} className="btn btn-secondary h-10 self-start px-4 text-sm">
+                    <button onClick={() => pickTarget(ans.fix.value)} className="btn btn-secondary h-9 self-start px-3.5 text-[13px]">
                       Aim for {withArticle(ans.fix.label)} instead
                     </button>
                   )}
@@ -468,12 +471,15 @@ export default function GradeCalculator({ course, goal = null, onClose }) {
                     .filter((g) => g.open.length)
                     .map((g) => (
                       <div key={g.id} className="flex shrink-0 flex-col">
-                        <div className="flex h-10 items-center gap-2 pt-1.5">
-                          <span className="text-[13px] font-extrabold">{g.name}</span>
-                          <span className="min-w-0 truncate text-[12.5px] font-semibold" style={{ color: MUTED }}>
-                            · {model.weighted ? `counts for ${trim(g.weight)}% of your grade` : `${trim(g.possible)} points in all`}
+                        {/* Long category names wrap onto a second line instead of being cut off. */}
+                        <div className="flex min-h-10 items-baseline gap-2 pb-1.5 pt-3.5">
+                          <span className="min-w-0 flex-1 leading-snug">
+                            <span className="text-[13px] font-extrabold">{g.name}</span>{" "}
+                            <span className="text-[12.5px] font-semibold" style={{ color: MUTED }}>
+                              · {model.weighted ? `counts for ${trim(g.weight)}% of your grade` : `${trim(g.possible)} points in all`}
+                            </span>
                           </span>
-                          <span className="ml-auto shrink-0 text-xs font-semibold" style={{ color: MUTED }}>
+                          <span className="shrink-0 text-xs font-semibold" style={{ color: MUTED }}>
                             {g.open.length} left
                           </span>
                         </div>
@@ -550,13 +556,13 @@ export default function GradeCalculator({ course, goal = null, onClose }) {
                 Couldn&apos;t save. Try again.
               </span>
             )}
-            <button onClick={reset} className="btn btn-soft h-10 px-4 text-sm" disabled={!breakdown}>
+            <button onClick={reset} className="btn btn-soft h-9 px-3.5 text-[13px]" disabled={!breakdown}>
               Reset
             </button>
-            <button onClick={save} className="btn btn-primary h-10 px-[18px] text-sm" disabled={!breakdown || !tValid || saveState === "saving"}>
+            <button onClick={save} className="btn btn-primary h-9 px-3.5 text-[13px]" disabled={!breakdown || !tValid || saveState === "saving"}>
               Save as my goal
             </button>
-            <button onClick={onClose} className="btn btn-secondary h-10 px-[18px] text-sm">
+            <button onClick={onClose} className="btn btn-secondary h-9 px-3.5 text-[13px]">
               Close
             </button>
           </footer>
@@ -588,7 +594,7 @@ export default function GradeCalculator({ course, goal = null, onClose }) {
                   closeHelp();
                   helpBtnRef.current?.focus();
                 }}
-                className="btn btn-primary h-[38px] self-end px-[18px] text-sm"
+                className="btn btn-primary h-9 self-end px-3.5 text-[13px]"
               >
                 Got it
               </button>
@@ -662,19 +668,20 @@ function ItemRow({ it, group, cols, plan, reachedAll, fineTune, details, typed, 
   const tip = `${it.name}: ${it.placeholder ? "not posted yet" : `${trim(it.points)} points`}, worth ${it.share.toFixed(1)}% of your final grade`;
   return (
     <div
-      className={`${mine ? "c-tint" : "row-hover"} -mx-2 grid h-12 items-center gap-x-4 rounded-[10px] px-2`}
+      className={`${mine ? "c-tint" : "row-hover"} -mx-2 grid min-h-12 items-center gap-x-4 rounded-[10px] px-2 py-1.5`}
       style={{ gridTemplateColumns: cols }}
       title={tip}
     >
       <div className="flex min-w-0 flex-col gap-px">
-        <span className="truncate text-[13.5px] font-semibold">{it.name}</span>
+        {/* Long names wrap (the row grows) instead of ending in "...". A slash is a place to break. */}
+        <span className="text-[13.5px] font-semibold leading-snug [overflow-wrap:anywhere]">{it.name.replaceAll("/", "/\u200B")}</span>
         {it.placeholder && (
-          <span className="truncate text-[11.5px]" style={{ color: MUTED }}>
+          <span className="text-[11.5px] leading-snug" style={{ color: MUTED }}>
             Not posted yet, counts as one item worth {trim(group.weight)}%
           </span>
         )}
       </div>
-      <span className="truncate whitespace-nowrap text-[12.5px] font-semibold" style={{ color: it.dueAt ? SOFT : MUTED }}>
+      <span className="text-[12.5px] font-semibold leading-snug" style={{ color: it.dueAt ? SOFT : MUTED }}>
         {it.placeholder ? "Not posted yet" : dueText(it.dueAt)}
       </span>
       {fineTune && (
@@ -721,7 +728,7 @@ function CalcSkeleton() {
         <div className={`${box} h-6 w-3/4`} />
         <div className="grid grid-cols-5 gap-1.5">
           {[0, 1, 2, 3, 4].map((i) => (
-            <div key={i} className={`${box} h-[58px]`} />
+            <div key={i} className={`${box} h-[50px]`} />
           ))}
         </div>
         <div className={`${box} h-9 w-1/2`} />

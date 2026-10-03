@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import WeekStrip from "./WeekStrip";
 import QuickAdd from "./QuickAdd";
 import GradeCalculator from "./GradeCalculator";
 import ManageClasses from "./ManageClasses";
@@ -551,7 +550,7 @@ export default function Dashboard({
 
   // Two tabs (DASH-17) share this shell: the top bar, the pop-ups (Search, Quick look, Grade calculator,
   // Manage classes) and the toast. On wide windows (xl) each tab fits one screen and its panels
-  // scroll on their own; narrower windows stack the pieces and the page scrolls.
+  // Today: a left sidebar (Next class + Grades) beside [board | Incoming] (no week strip since DASH-19).
   // Today: a left sidebar (Next class + Grades) beside a slim 7-day strip over [board | Incoming].
   // This term: TermView.jsx (3-week calendar and exams | My classes).
   const clearAll =
@@ -619,10 +618,10 @@ export default function Dashboard({
             items={items}
             status={status}
             headsUp={headsUp}
-            announcements={activeAnnouncements}
-            readIds={readIds}
             onLookItem={lookItem}
             onLookAnnouncement={lookAnnouncement}
+            calendarEnabled={calendarEnabled}
+            calendarError={calendarError}
             onCalculator={(course, goal) => setCalc({ course, goal })}
           />
         </div>
@@ -687,21 +686,8 @@ export default function Dashboard({
           </section>
         </aside>
 
-        {/* Main area: slim 7-day strip, then board | Incoming */}
-        <div className="flex min-w-0 flex-col gap-4 xl:min-h-0 xl:flex-1 xl:gap-3.5">
-          <WeekStrip
-            items={visibleItems}
-            status={status}
-            events={events}
-            calendarEnabled={calendarEnabled}
-            calendarError={calendarError}
-            now={now}
-            colorFor={colorFor}
-            nameFor={nameFor}
-            onLook={lookItem}
-          />
-
-      <div className="grid grid-cols-1 gap-5 xl:min-h-[300px] xl:flex-1 xl:grid-cols-[minmax(0,1fr)_260px] xl:grid-rows-1 xl:gap-4 min-[90rem]:grid-cols-[minmax(0,1fr)_300px]">
+        {/* Main area: board | Incoming (the 7-day strip is gone: This term has the calendar, DASH-19) */}
+        <div className="grid min-w-0 grid-cols-1 gap-5 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(0,1fr)_260px] xl:grid-rows-1 xl:gap-4 min-[90rem]:grid-cols-[minmax(0,1fr)_300px]">
         {/* Board */}
         <section className="flex min-h-0 min-w-0 flex-col" aria-labelledby="board-heading">
           {/* Heading row: title, the "Only X" filter chip, and the quick-add bar. */}
@@ -840,7 +826,6 @@ export default function Dashboard({
             )
           }
         />
-      </div>
         </div>
       </div>
       {children}

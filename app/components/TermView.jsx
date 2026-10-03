@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { weekStart, dayRange } from "@/lib/crunch";
 import { displayCode } from "@/lib/courseNames";
 import { groupTotals } from "@/lib/gradeMath";
@@ -8,7 +9,6 @@ import { letterScale, letterFor } from "@/lib/gradeGoals";
 import { goalSentence } from "@/lib/gradeCalc";
 import { DateTile, countdownStyle, examLink, examTime, Related } from "./HeadsUp";
 import { useGradeGoal, GoalPill, GoalTick, GoalEditor } from "./GradeGoal";
-import { classGlance, dueCountdown } from "@/lib/classGlance";
 
 const INK = "var(--ink)";
 const MUTED = "var(--muted)";
@@ -48,10 +48,10 @@ function Star({ className = "h-[11px] w-[11px]" }) {
 // This term (DASH-16). Left, "Coming up": this week and the next two on a calendar (items as
 // class-colored dots, exams as stars, a heavy week shaded amber) with the exam cards under it.
 // Right, "My classes": each class's grade, its real Canvas categories as a bar (solid = graded,
-// striped = still to come), its next exam and goal; a row opens to the class at a glance, the
-// category table, one goal sentence and the grade calculator. Pointing at a class lights up its work
+// striped = still to come), its next exam and goal; a row opens to who teaches it, the category
+// table, one goal sentence and one line of buttons (CLASS-12). Pointing at a class lights up its work
 // on the calendar.
-export default function TermView({ now, courses, items, status, headsUp, announcements = [], readIds, onLookItem, onLookAnnouncement, onCalculator }) {
+export default function TermView({ now, courses, items, status, headsUp, onLookItem, onLookAnnouncement, calendarEnabled = false, calendarError = null, onCalculator }) {
   const [hover, setHover] = useState(null); // course id lit up on the calendar
   const [openId, setOpenId] = useState(null); // the class row that's open
   const breakdowns = useBreakdowns(courses);
@@ -72,6 +72,21 @@ export default function TermView({ now, courses, items, status, headsUp, announc
               {dayRange(weekStart(now), weekStart(now) + 20 * DAY)}
             </span>
           )}
+          {calendarError ? (
+            <span className="whitespace-nowrap text-xs font-semibold" style={{ color: "var(--red-fg)" }} title={`Your calendar didn't load: ${calendarError}`}>
+              Calendar didn&apos;t load
+            </span>
+          ) : !calendarEnabled ? (
+            <Link
+              href="/setup"
+              scroll={false}
+              className="text-link whitespace-nowrap text-xs font-semibold underline"
+              style={{ color: "var(--ink-soft)" }}
+              title="Add your Google or Outlook calendar in Settings so exams and class events from it show here"
+            >
+              Add your calendar
+            </Link>
+          ) : null}
           {hovered && (
             <button
               onClick={() => setHover(null)}
@@ -139,16 +154,11 @@ export default function TermView({ now, courses, items, status, headsUp, announc
               course={c}
               data={breakdowns[c.id]}
               exam={nextExam(c.id)}
-              now={now}
               open={openId === c.id}
               onToggle={() => setOpenId(openId === c.id ? null : c.id)}
               matched={hover === c.id}
               onHover={() => setHover(c.id)}
               onCalculator={(goal) => onCalculator(c, goal)}
-              glance={openId === c.id && now ? classGlance({ courseId: c.id, items, status, announcements, now }) : null}
-              readIds={readIds}
-              onLookItem={onLookItem}
-              onLookAnnouncement={onLookAnnouncement}
             />
           ))}
         </div>
@@ -440,7 +450,7 @@ function fmtPct(n, digits = 0) {
   return `${Number(n).toFixed(digits)}%`;
 }
 
-function ClassRow({ course, data, exam, now, open, onToggle, matched, onHover, onCalculator, glance, readIds, onLookItem, onLookAnnouncement }) {
+function ClassRow({ course, data, exam, open, onToggle, matched, onHover, onCalculator }) {
   const [goalOpen, setGoalOpen] = useState(false);
   const goalRef = useRef(null);
   const g = useGradeGoal(course, goalOpen);
@@ -566,14 +576,16 @@ function ClassRow({ course, data, exam, now, open, onToggle, matched, onHover, o
       )}
 
       {open && (
-        <div id={panelId} className="ml-[58px] flex flex-col gap-2.5">
-          {glance && <ClassGlance glance={glance} now={now} readIds={readIds} onLookItem={onLookItem} onLookAnnouncement={onLookAnnouncement} />}
-          {!data && <p className="text-xs" style={{ color: MUTED }}>Loading this class&apos;s categories…</p>}
-          {data?.error && <p className="text-xs" style={{ color: "var(--red-fg)" }}>Couldn&apos;t load this class&apos;s categories from Canvas.</p>}
-          {breakdown && <CategoryTable cats={cats} weighted={breakdown.weighted} />}
-          {breakdown && <GoalLine course={course} breakdown={breakdown} goal={g.goal} />}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <button onClick={() => onCalculator(g.goal)} className="btn btn-course h-[34px] rounded-[10px] px-3 text-[13px]">
+        <div id={panelId} className="flex flex-col gap-2.5">
+          <div className="ml-[58px] flex flex-col gap-2.5">
+            {!data && <p className="text-xs" style={{ color: MUTED }}>Loading this class&apos;s categories…</p>}
+            {data?.error && <p className="text-xs" style={{ color: "var(--red-fg)" }}>Couldn&apos;t load this class&apos;s categories from Canvas.</p>}
+            {breakdown && <CategoryTable cats={cats} weighted={breakdown.weighted} />}
+            {breakdown && <GoalLine course={course} breakdown={breakdown} goal={g.goal} />}
+          </div>
+          {/* One line of three equal buttons across the whole row (CLASS-12); below sm they stack. */}
+          <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
+            <button onClick={() => onCalculator(g.goal)} className="btn btn-course h-[34px] whitespace-nowrap rounded-[10px] px-2.5 text-[13px]">
               <CalcIcon />
               Open grade calculator
             </button>
@@ -581,33 +593,20 @@ function ClassRow({ course, data, exam, now, open, onToggle, matched, onHover, o
               onClick={() => setGoalOpen(!goalOpen)}
               aria-expanded={goalOpen}
               aria-controls={goalPanelId}
-              className="btn btn-soft h-[34px] rounded-[10px] px-2.5 text-[13px]"
+              className="btn btn-soft h-[34px] whitespace-nowrap rounded-[10px] px-2.5 text-[13px]"
             >
               {g.goal === null ? "Set a goal" : "Change goal"}
             </button>
-            {/* The two Canvas links stay together; on narrow rows they move to their own line. */}
-            <span className="ml-auto flex shrink-0 gap-1.5">
-              <a href={course.homeUrl} target="_blank" rel="noreferrer" className="btn btn-soft h-[34px] rounded-[10px] px-2.5 text-[13px]">
-                Open in Canvas
-                <OutArrow />
-              </a>
-              <a href={course.gradesUrl} target="_blank" rel="noreferrer" className="btn btn-soft h-[34px] rounded-[10px] px-2.5 text-[13px]">
-                Grades in Canvas
-                <OutArrow />
-              </a>
-            </span>
+            <a href={course.gradesUrl} target="_blank" rel="noreferrer" className="btn btn-soft h-[34px] whitespace-nowrap rounded-[10px] px-2.5 text-[13px]">
+              Grades in Canvas
+              <OutArrow />
+            </a>
           </div>
         </div>
       )}
     </div>
   );
 }
-
-const TONE = {
-  red: { background: "var(--red-bg)", color: "var(--red-fg)" },
-  amber: { background: "var(--amber-bg)", color: "var(--amber-fg)" },
-  calm: { background: "var(--blue-bg)", color: "var(--blue-fg)" },
-};
 
 function OutArrow() {
   return (
@@ -617,33 +616,17 @@ function OutArrow() {
   );
 }
 
-// "Tue 10/6, 11:59 PM"
-function dueWhen(iso) {
-  const d = new Date(iso);
-  return `${d.toLocaleDateString(undefined, { weekday: "short" })} ${d.getMonth() + 1}/${d.getDate()}, ${d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
-}
-
-function postedAgo(iso, now) {
-  if (!iso) return "";
-  const mins = Math.round((now - new Date(iso).getTime()) / 60000);
-  if (mins < 60) return `${Math.max(mins, 1)} min ago`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.round(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
 // Who teaches the class (CLASS-9), as a quiet line under an open row's name: "Taught by Dr. Smith ·
 // Message in Canvas". More than two teachers: "+N more", with every name on hover.
 function TaughtBy({ teachers, messageUrl }) {
   if (!teachers.length && !messageUrl) return null;
   const shown = teachers.slice(0, 2).map((t) => t.name).join(", ");
   return (
-    <div className="flex min-w-0 items-center gap-1.5 text-xs" style={{ color: MUTED }}>
+    <div className="flex min-w-0 items-center gap-1.5 text-[13px]" style={{ color: MUTED }}>
+      <PersonIcon />
       {teachers.length > 0 && (
         <span className="min-w-0 truncate" title={teachers.map((t) => t.name).join("\n")}>
-          Taught by <span className="font-bold" style={{ color: "var(--ink-soft)" }}>{shown}</span>
+          Taught by <span className="font-semibold" style={{ color: INK }}>{shown}</span>
           {teachers.length > 2 && ` +${teachers.length - 2} more`}
         </span>
       )}
@@ -655,6 +638,15 @@ function TaughtBy({ teachers, messageUrl }) {
         </a>
       )}
     </div>
+  );
+}
+
+function PersonIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[13px] w-[13px] shrink-0" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4.5 20.5c1.2-3.6 4-5.5 7.5-5.5s6.3 1.9 7.5 5.5" />
+    </svg>
   );
 }
 
@@ -689,94 +681,6 @@ function CalcIcon() {
       <rect x="5" y="3" width="14" height="18" rx="3" />
       <path d="M8.5 7h7M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01M8.5 15h.01M12 15h.01M15.5 15h.01" />
     </svg>
-  );
-}
-
-// "Class at a glance" (CLASS-9), at the top of an open class row: the next 3 things due and the
-// newest announcement (both open in Quick look; opening an announcement marks it read, as
-// everywhere). Who teaches it sits under the class name (TaughtBy); the Canvas links sit with the
-// row's buttons.
-function ClassGlance({ glance, now, readIds, onLookItem, onLookAnnouncement }) {
-  const label = "text-[10.5px] font-extrabold uppercase tracking-[0.07em]";
-  const a = glance.announcement;
-  const unread = a && !readIds?.has(a.id);
-  return (
-    <div className="flex flex-col gap-2 border-b border-[var(--chip)] pb-2.5">
-      <div className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <span className={`${label} px-1.5`} style={{ color: MUTED }}>
-            Due next
-          </span>
-          {glance.next.length === 0 && (
-            <p className="px-1.5 py-1 text-xs" style={{ color: "var(--ink-soft)" }}>
-              Nothing left to do in Canvas right now.
-            </p>
-          )}
-          {glance.next.map((i) => {
-            const pill = dueCountdown(new Date(i.dueAt).getTime(), now);
-            const body = (
-              <>
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-[12.5px] font-bold" style={{ color: INK }}>
-                    {i.title}
-                  </span>
-                  <span className="truncate text-[11px] font-semibold" style={{ color: MUTED }}>
-                    {dueWhen(i.dueAt)}
-                  </span>
-                </span>
-                <span className="shrink-0 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[10.5px] font-extrabold" style={TONE[pill.tone]}>
-                  {pill.text}
-                </span>
-              </>
-            );
-            const cls = "flex min-w-0 items-center gap-2 rounded-lg px-1.5 py-1";
-            return i.url ? (
-              <a key={i.key} href={i.url} target="_blank" rel="noreferrer" onClick={(e) => onLookItem(e, i)} className={`${cls} row-hover`} title={i.title}>
-                {body}
-              </a>
-            ) : (
-              <div key={i.key} className={cls} title={i.title}>
-                {body}
-              </div>
-            );
-          })}
-          {glance.more > 0 && (
-            <span className="px-1.5 text-[11px] font-bold" style={{ color: MUTED }}>
-              +{glance.more} more this term
-            </span>
-          )}
-        </div>
-
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <span className={`${label} px-1.5`} style={{ color: MUTED }}>
-            Latest announcement
-          </span>
-          {a ? (
-            <a href={a.url} target="_blank" rel="noreferrer" onClick={(e) => onLookAnnouncement(e, a)} className="row-hover flex min-w-0 flex-col gap-px rounded-lg px-1.5 py-1" title={a.title}>
-              <span className="flex min-w-0 items-center gap-1.5">
-                {unread && <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-[var(--brand)]" title="Unread" />}
-                <span className="truncate text-[12.5px] font-bold" style={{ color: INK }}>
-                  {a.title}
-                </span>
-              </span>
-              <span className="text-[11px] font-semibold" style={{ color: MUTED }}>
-                {postedAgo(a.postedAt, now)}
-              </span>
-              {a.preview && (
-                <span className="truncate text-[11.5px]" style={{ color: "var(--ink-soft)" }}>
-                  {a.preview}
-                </span>
-              )}
-            </a>
-          ) : (
-            <p className="px-1.5 py-1 text-xs" style={{ color: "var(--ink-soft)" }}>
-              No announcements lately.
-            </p>
-          )}
-        </div>
-      </div>
-
-    </div>
   );
 }
 
