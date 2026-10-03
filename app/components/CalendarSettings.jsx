@@ -30,7 +30,7 @@ export function Segmented({ value, onChange, options, label }) {
   );
 }
 
-export function ShowSelect({ value, onChange, label = "Show on week strip" }) {
+export function ShowSelect({ value, onChange, label = "On the This term calendar, show" }) {
   return (
     <select
       value={value}
@@ -39,7 +39,7 @@ export function ShowSelect({ value, onChange, label = "Show on week strip" }) {
       className="rounded-lg bg-[var(--field)] px-2 py-1.5 text-sm font-semibold"
       style={{ color: INK }}
     >
-      <option value="classes">Class events only</option>
+      <option value="classes">Classes only</option>
       <option value="all">Everything</option>
     </select>
   );
@@ -104,9 +104,10 @@ export function LinkedCalendars({ calendars, setCalendars, newUrl, setNewUrl, ne
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm" style={{ color: MUTED }}>
-        <b style={{ color: INK }}>Google or Outlook → this dashboard.</b> Your events show on the week strip and help
-        Smart Check in find your class times. By default only events that mention one of your classes show up, so
-        personal plans stay off the strip.
+        <b style={{ color: INK }}>Google or Outlook → this dashboard.</b> Your events show on the This term calendar
+        and help the Next class card find your class times. By default only events that mention one of your classes
+        show up, so personal plans stay off. Pick <b style={{ color: INK }}>Everything</b> to see all of a
+        calendar&apos;s events there.
       </p>
 
       {calendars.length > 0 && (
@@ -115,6 +116,9 @@ export function LinkedCalendars({ calendars, setCalendars, newUrl, setNewUrl, ne
             <li key={c.index} className="flex flex-wrap items-center gap-2 px-3 py-2.5">
               <span className="min-w-0 flex-1 text-sm font-bold" style={{ color: INK }}>
                 {CALENDAR_LABELS[c.kind] || CALENDAR_LABELS.other}
+              </span>
+              <span className="text-xs font-semibold" style={{ color: MUTED }} aria-hidden="true">
+                On This term, show
               </span>
               <ShowSelect
                 value={c.show}
@@ -140,7 +144,7 @@ export function LinkedCalendars({ calendars, setCalendars, newUrl, setNewUrl, ne
           </span>
           <CalendarLinkField source={source} setSource={setSource} url={newUrl} setUrl={setNewUrl} />
           <label className="flex flex-wrap items-center gap-2 text-sm" style={{ color: "var(--ink-soft)" }}>
-            Show on the week strip:
+            On the This term calendar, show:
             <ShowSelect value={newShow} onChange={setNewShow} />
           </label>
           <p className="text-xs" style={{ color: MUTED }}>

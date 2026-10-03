@@ -271,9 +271,9 @@ export default function Onboarding({ tour = null }) {
               <Card>
                 <Title>Add your calendar?</Title>
                 <Lead>
-                  Optional. Google Calendar or Outlook. Events about your classes show up in the week view, and class
-                  times help Smart Check in find your classes. Personal events stay off the dashboard unless you turn
-                  them on in Settings.
+                  Optional. Google Calendar or Outlook. Events about your classes show up on the This term calendar,
+                  and class times help the Next class card find your classes. Personal events stay off the dashboard
+                  unless you turn them on in Settings.
                 </Lead>
                 <div className="mt-4">
                   <CalendarLinkField

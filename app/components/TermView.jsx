@@ -4,6 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { weekStart, dayRange } from "@/lib/crunch";
 import { displayCode } from "@/lib/courseNames";
+import { eventsOnDays } from "@/lib/calendarDays";
 import { groupTotals } from "@/lib/gradeMath";
 import { letterScale, letterFor } from "@/lib/gradeGoals";
 import { goalSentence } from "@/lib/gradeCalc";
@@ -37,6 +38,31 @@ function shortWhen(exam) {
   return `${day}, ${d.toLocaleTimeString(undefined, d.getMinutes() ? { hour: "numeric", minute: "2-digit" } : { hour: "numeric" })}`;
 }
 
+// "10 AM" or "9:30 AM".
+function clock(ms) {
+  const d = new Date(ms);
+  return d.toLocaleTimeString(undefined, d.getMinutes() ? { hour: "numeric", minute: "2-digit" } : { hour: "numeric" });
+}
+
+// The hover text for a linked-calendar event: "10:00 AM to 11:15 AM", "All day", or the range
+// when it runs over several days.
+function eventWhen(ev) {
+  const day = (ms) => new Date(ms).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  const time = (ms) => new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  if (ev.allDay) {
+    const [y, m, d] = String(ev.start).split("-").map(Number);
+    const [y2, m2, d2] = String(ev.end || ev.start).split("-").map(Number);
+    const first = new Date(y, m - 1, d).getTime();
+    const last = new Date(y2, m2 - 1, d2 - 1).getTime(); // the end date is exclusive
+    return last > first ? `All day, ${day(first)} to ${day(last)}` : "All day";
+  }
+  const s = new Date(ev.start).getTime();
+  const e = new Date(ev.end || ev.start).getTime();
+  if (!(e > s)) return time(s);
+  // Ending at midnight still counts as the same day.
+  return dateKey(s) === dateKey(e - 1) ? `${time(s)} to ${time(e)}` : `${day(s)} ${time(s)} to ${day(e)} ${time(e)}`;
+}
+
 function Star({ className = "h-[11px] w-[11px]" }) {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" className={`shrink-0 ${className}`} fill="currentColor">
@@ -50,8 +76,9 @@ function Star({ className = "h-[11px] w-[11px]" }) {
 // Right, "My classes": each class's grade, its real Canvas categories as a bar (solid = graded,
 // striped = still to come), its next exam and goal; a row opens to who teaches it, the category
 // table, one goal sentence and one line of buttons (CLASS-12). Pointing at a class lights up its work
-// on the calendar.
-export default function TermView({ now, courses, items, status, headsUp, onLookItem, onLookAnnouncement, calendarEnabled = false, calendarError = null, onCalculator }) {
+// on the calendar. Linked-calendar events (DASH-19) show in the day cells too: `events` arrives
+// already filtered by each calendar's "Classes only / Everything" choice (lib/loadDashboard.js).
+export default function TermView({ now, courses, items, status, headsUp, events = [], onLookItem, onLookAnnouncement, calendarEnabled = false, calendarError = null, onCalculator }) {
   const [hover, setHover] = useState(null); // course id lit up on the calendar
   const [openId, setOpenId] = useState(null); // the class row that's open
   const breakdowns = useBreakdowns(courses);
@@ -59,6 +86,8 @@ export default function TermView({ now, courses, items, status, headsUp, onLookI
   const courseById = useMemo(() => Object.fromEntries(courses.map((c) => [String(c.id), c])), [courses]);
   const hovered = hover !== null ? courseById[String(hover)] : null;
   const nextExam = (courseId) => headsUp.exams.find((x) => String(x.courseId) === String(courseId)) || null;
+  const weeks = useTermWeeks({ now, items, status, exams: headsUp.exams, crunch: headsUp.crunch, events, onLookItem, onLookAnnouncement });
+  const hasEvents = Boolean(weeks?.some((w) => w.days.some((d) => d.entries.some((e) => e.event))));
 
   return (
     <div className="flex flex-col gap-4 xl:min-h-0 xl:flex-1 xl:flex-row">
@@ -110,6 +139,12 @@ export default function TermView({ now, courses, items, status, headsUp, onLookI
               <Star className="h-3 w-3" />
               Exam
             </span>
+            {hasEvents && (
+              <span className="flex items-center gap-[5px]">
+                <span className="h-[7px] w-[7px] rounded-full" style={{ boxShadow: "inset 0 0 0 1.5px var(--ink-soft)" }} aria-hidden="true" />
+                Event
+              </span>
+            )}
             <span className="flex items-center gap-[5px]">
               <span className="h-2.5 w-3 rounded-[3px]" style={{ background: "var(--heavy)", boxShadow: "inset 0 0 0 1.5px var(--amber-line)" }} aria-hidden="true" />
               Heavy week
@@ -117,7 +152,7 @@ export default function TermView({ now, courses, items, status, headsUp, onLookI
           </div>
         </div>
 
-        <Calendar now={now} items={items} status={status} exams={headsUp.exams} crunch={headsUp.crunch} courseById={courseById} hover={hover} onLookItem={onLookItem} onLookAnnouncement={onLookAnnouncement} />
+        <Calendar now={now} weeks={weeks} courseById={courseById} hover={hover} />
 
         <ExamCards exams={headsUp.exams} ready={headsUp.ready} courseById={courseById} hover={hover} onLookItem={onLookItem} onLookAnnouncement={onLookAnnouncement} />
       </section>
@@ -192,8 +227,10 @@ function useBreakdowns(courses) {
 
 // ---------- Coming up: the 3-week calendar ----------
 
-function Calendar({ now, items, status, exams, crunch, courseById, hover, onLookItem, onLookAnnouncement }) {
-  const weeks = useMemo(() => {
+// The 3 weeks of day cells: due items (class dots), exams (stars) and linked-calendar events
+// (rings), each day sorted exams first, then by time.
+function useTermWeeks({ now, items, status, exams, crunch, events, onLookItem, onLookAnnouncement }) {
+  return useMemo(() => {
     if (!now) return null;
     const start = weekStart(now);
     const examItemKeys = new Set(exams.filter((x) => x.item).map((x) => x.item.key));
@@ -225,14 +262,35 @@ function Calendar({ now, items, status, exams, crunch, courseById, hover, onLook
       const { href, onClick } = examLink(x, onLookItem, onLookAnnouncement);
       push(x.day, { key: `exam-${x.id}`, at: x.at, title: x.title, courseId: x.courseId, done: false, exam: true, href, open: onClick });
     }
+    // Every day of the 3 weeks (DST-safe day steps), then the linked-calendar events on them.
+    // An event that is already an exam's source shows once, as the exam's star.
+    const dayStarts = Array.from({ length: 21 }, (_, d) => new Date(start).setDate(new Date(start).getDate() + d));
+    const examEventIds = new Set(exams.map((x) => x.event?.id).filter(Boolean));
+    const onDays = eventsOnDays(events.filter((ev) => !examEventIds.has(ev.id)), dayStarts);
+    onDays.forEach((list, d) => {
+      for (const { event: ev, first } of list) {
+        const timed = !ev.allDay && first;
+        push(dayStarts[d], {
+          key: `ev-${ev.id}-${d}`,
+          at: timed ? new Date(ev.start).getTime() : dayStarts[d],
+          title: ev.title,
+          courseId: ev.courseId ?? null,
+          done: false,
+          exam: false,
+          event: true,
+          time: timed ? clock(new Date(ev.start).getTime()) : "",
+          when: eventWhen(ev),
+          href: ev.url || null,
+        });
+      }
+    });
     for (const list of byDay.values()) list.sort((a, b) => b.exam - a.exam || a.at - b.at);
 
     const today = dateKey(now);
     const todayStart = new Date(now).setHours(0, 0, 0, 0);
     return [0, 1, 2].map((w) => {
-      const ws = start + w * 7 * DAY;
       const days = DAY_NAMES.map((_, d) => {
-        const ms = new Date(ws).setDate(new Date(ws).getDate() + d); // DST-safe day steps
+        const ms = dayStarts[w * 7 + d];
         return { ms, key: dateKey(ms), today: dateKey(ms) === today, past: ms < todayStart, entries: byDay.get(dateKey(ms)) || [] };
       });
       const heavy = (crunch.weeks || []).find((x) => x.heavy && x.start === weekStart(days[0].ms)) || null;
@@ -241,8 +299,10 @@ function Calendar({ now, items, status, exams, crunch, courseById, hover, onLook
       return w < 2 ? { name: WEEK_NAMES[w], range, days, heavy } : { name: range, range: WEEK_NAMES[w], days, heavy };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [now && Math.floor(now / 3600000), items, status, exams, crunch]);
+  }, [now && Math.floor(now / 3600000), items, status, exams, crunch, events]);
+}
 
+function Calendar({ now, weeks, courseById, hover }) {
   if (!weeks) return <div className="panel min-h-[420px] xl:min-h-0 xl:flex-1" aria-hidden="true" />;
   const todayIdx = (new Date(now).getDay() + 6) % 7;
 
@@ -312,7 +372,7 @@ function DayCell({ day, heavy, top, courseById, hover }) {
   return (
     <div
       role="gridcell"
-      aria-label={`${label}${day.entries.length ? `, ${day.entries.length} due` : ""}`}
+      aria-label={cellLabel(label, day.entries)}
       className={`flex min-h-0 min-w-0 flex-col gap-[3px] overflow-hidden border-l border-[var(--chip)] px-1.5 pb-1.5 pt-[7px] ${top ? "border-t" : ""}`}
       style={day.today ? { background: "var(--today)", boxShadow: "inset 0 0 0 1.5px var(--brand-ring)" } : heavy ? { background: "var(--heavy)" } : undefined}
     >
@@ -327,6 +387,7 @@ function DayCell({ day, heavy, top, courseById, hover }) {
         const match = hover !== null && String(e.courseId) === String(hover);
         const dim = hover !== null && !match;
         const cls = `cal-item flex min-w-0 items-center gap-[5px] rounded-md px-[5px] py-0.5 text-[11.5px] font-bold whitespace-nowrap ${e.exam ? "cal-exam c-text" : ""} ${match ? "term-match c-text" : ""} ${dim ? "term-dim" : ""}`;
+        if (e.event) return <EventEntry key={e.key} e={e} course={course} cls={cls} match={match} />;
         const tip = `${course?.name || "Personal"}: ${e.title}${e.done ? " (done)" : ""}`;
         const body = (
           <>
@@ -356,6 +417,43 @@ function DayCell({ day, heavy, top, courseById, hover }) {
         </span>
       )}
     </div>
+  );
+}
+
+function cellLabel(label, entries) {
+  const events = entries.filter((e) => e.event).length;
+  const due = entries.length - events;
+  const parts = [due && `${due} due`, events && `${events} event${events === 1 ? "" : "s"}`].filter(Boolean);
+  return parts.length ? `${label}, ${parts.join(", ")}` : label;
+}
+
+// A linked-calendar event in a day cell: a ring (gray, or the class's color when the title names
+// a class), the start time on its first day, and the title. There's no Canvas page behind it, so
+// no Quick look: a link on the event opens in the usual pop-up window, otherwise it's plain text.
+function EventEntry({ e, course, cls, match }) {
+  const tip = `${course ? `${course.name}: ` : ""}${e.title}\n${e.when}`;
+  const style = { "--c": course?.color || "#8A879C" };
+  const body = (
+    <>
+      <span className="h-[7px] w-[7px] shrink-0 rounded-full" style={{ boxShadow: `inset 0 0 0 1.5px ${course ? "var(--c)" : "var(--ink-soft)"}` }} aria-hidden="true" />
+      {e.time && (
+        <span className="shrink-0 font-semibold" style={{ color: match ? undefined : MUTED }}>
+          {e.time}
+        </span>
+      )}
+      <span className="min-w-0 truncate font-semibold" style={match ? undefined : { color: "var(--ink-soft)" }}>
+        {e.title}
+      </span>
+    </>
+  );
+  return e.href ? (
+    <a href={e.href} target="_blank" rel="noreferrer" className={`${cls} hover:underline`} style={style} title={tip}>
+      {body}
+    </a>
+  ) : (
+    <span className={cls} style={style} title={tip}>
+      {body}
+    </span>
   );
 }
 

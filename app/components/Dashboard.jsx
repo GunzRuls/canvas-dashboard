@@ -550,8 +550,8 @@ export default function Dashboard({
 
   // Two tabs (DASH-17) share this shell: the top bar, the pop-ups (Search, Quick look, Grade calculator,
   // Manage classes) and the toast. On wide windows (xl) each tab fits one screen and its panels
+  // scroll on their own.
   // Today: a left sidebar (Next class + Grades) beside [board | Incoming] (no week strip since DASH-19).
-  // Today: a left sidebar (Next class + Grades) beside a slim 7-day strip over [board | Incoming].
   // This term: TermView.jsx (3-week calendar and exams | My classes).
   const clearAll =
     visibleAnnouncements.length > 0 ? (
@@ -618,6 +618,7 @@ export default function Dashboard({
             items={items}
             status={status}
             headsUp={headsUp}
+            events={events}
             onLookItem={lookItem}
             onLookAnnouncement={lookAnnouncement}
             calendarEnabled={calendarEnabled}

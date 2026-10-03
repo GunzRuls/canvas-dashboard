@@ -58,7 +58,6 @@ export default async function DashboardLayout({ children }) {
       events={data.calendar.events}
       calendarEnabled={calendarEnabled()}
       calendarError={data.calendar.error}
-      hiddenEvents={data.calendar.hidden}
       digestEnabled={digestEnabled()}
       newGrades={data.newGrades}
       sessions={data.sessions}
