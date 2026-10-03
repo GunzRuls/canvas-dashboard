@@ -3,8 +3,9 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { weekStart, dayRange } from "@/lib/crunch";
 import { displayCode } from "@/lib/courseNames";
-import { computeGrade, groupTotals, averageNeeded } from "@/lib/gradeMath";
-import { letterScale, letterFor, goalWords } from "@/lib/gradeGoals";
+import { groupTotals } from "@/lib/gradeMath";
+import { letterScale, letterFor } from "@/lib/gradeGoals";
+import { goalSentence } from "@/lib/gradeCalc";
 import { DateTile, countdownStyle, examLink, examTime, Related } from "./HeadsUp";
 import { useGradeGoal, GoalPill, GoalTick, GoalEditor } from "./GradeGoal";
 import { classGlance, dueCountdown } from "@/lib/classGlance";
@@ -47,9 +48,10 @@ function Star({ className = "h-[11px] w-[11px]" }) {
 // This term (DASH-16). Left, "Coming up": this week and the next two on a calendar (items as
 // class-colored dots, exams as stars, a heavy week shaded amber) with the exam cards under it.
 // Right, "My classes": each class's grade, its real Canvas categories as a bar (solid = graded,
-// striped = still to come), its next exam and goal; a row opens to the category table and a quick
-// What-if. Pointing at a class lights up its work on the calendar.
-export default function TermView({ now, courses, items, status, headsUp, announcements = [], readIds, onLookItem, onLookAnnouncement, onWhatIf }) {
+// striped = still to come), its next exam and goal; a row opens to the class at a glance, the
+// category table, one goal sentence and the grade calculator. Pointing at a class lights up its work
+// on the calendar.
+export default function TermView({ now, courses, items, status, headsUp, announcements = [], readIds, onLookItem, onLookAnnouncement, onCalculator }) {
   const [hover, setHover] = useState(null); // course id lit up on the calendar
   const [openId, setOpenId] = useState(null); // the class row that's open
   const breakdowns = useBreakdowns(courses);
@@ -142,7 +144,7 @@ export default function TermView({ now, courses, items, status, headsUp, announc
               onToggle={() => setOpenId(openId === c.id ? null : c.id)}
               matched={hover === c.id}
               onHover={() => setHover(c.id)}
-              onWhatIf={() => onWhatIf(c)}
+              onCalculator={(goal) => onCalculator(c, goal)}
               glance={openId === c.id && now ? classGlance({ courseId: c.id, items, status, announcements, now }) : null}
               readIds={readIds}
               onLookItem={onLookItem}
@@ -438,7 +440,7 @@ function fmtPct(n, digits = 0) {
   return `${Number(n).toFixed(digits)}%`;
 }
 
-function ClassRow({ course, data, exam, now, open, onToggle, matched, onHover, onWhatIf, glance, readIds, onLookItem, onLookAnnouncement }) {
+function ClassRow({ course, data, exam, now, open, onToggle, matched, onHover, onCalculator, glance, readIds, onLookItem, onLookAnnouncement }) {
   const [goalOpen, setGoalOpen] = useState(false);
   const goalRef = useRef(null);
   const g = useGradeGoal(course, goalOpen);
@@ -485,6 +487,7 @@ function ClassRow({ course, data, exam, now, open, onToggle, matched, onHover, o
             </a>
             {code && <span className="c-text shrink-0 text-xs font-bold">{code}</span>}
           </div>
+          {open && <TaughtBy teachers={breakdown?.teachers || []} messageUrl={breakdown?.messageUrl || ""} />}
           <CategoryBar cats={cats} total={totalBasis} weighted={breakdown?.weighted} state={data ? (data.error ? "error" : "ok") : "loading"} />
           <div className="flex min-w-0 items-center gap-1.5 whitespace-nowrap text-xs" style={{ color: MUTED }}>
             {exam ? (
@@ -564,11 +567,36 @@ function ClassRow({ course, data, exam, now, open, onToggle, matched, onHover, o
 
       {open && (
         <div id={panelId} className="ml-[58px] flex flex-col gap-2.5">
-          {glance && <ClassGlance course={course} glance={glance} data={data} now={now} readIds={readIds} onLookItem={onLookItem} onLookAnnouncement={onLookAnnouncement} />}
+          {glance && <ClassGlance glance={glance} now={now} readIds={readIds} onLookItem={onLookItem} onLookAnnouncement={onLookAnnouncement} />}
           {!data && <p className="text-xs" style={{ color: MUTED }}>Loading this class&apos;s categories…</p>}
           {data?.error && <p className="text-xs" style={{ color: "var(--red-fg)" }}>Couldn&apos;t load this class&apos;s categories from Canvas.</p>}
           {breakdown && <CategoryTable cats={cats} weighted={breakdown.weighted} />}
-          {breakdown && <QuickWhatIf course={course} breakdown={breakdown} exam={exam} goal={g.goal} now={now} onWhatIf={onWhatIf} />}
+          {breakdown && <GoalLine course={course} breakdown={breakdown} goal={g.goal} />}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button onClick={() => onCalculator(g.goal)} className="btn btn-course h-[34px] rounded-[10px] px-3 text-[13px]">
+              <CalcIcon />
+              Open grade calculator
+            </button>
+            <button
+              onClick={() => setGoalOpen(!goalOpen)}
+              aria-expanded={goalOpen}
+              aria-controls={goalPanelId}
+              className="btn btn-soft h-[34px] rounded-[10px] px-2.5 text-[13px]"
+            >
+              {g.goal === null ? "Set a goal" : "Change goal"}
+            </button>
+            {/* The two Canvas links stay together; on narrow rows they move to their own line. */}
+            <span className="ml-auto flex shrink-0 gap-1.5">
+              <a href={course.homeUrl} target="_blank" rel="noreferrer" className="btn btn-soft h-[34px] rounded-[10px] px-2.5 text-[13px]">
+                Open in Canvas
+                <OutArrow />
+              </a>
+              <a href={course.gradesUrl} target="_blank" rel="noreferrer" className="btn btn-soft h-[34px] rounded-[10px] px-2.5 text-[13px]">
+                Grades in Canvas
+                <OutArrow />
+              </a>
+            </span>
+          </div>
         </div>
       )}
     </div>
@@ -606,14 +634,71 @@ function postedAgo(iso, now) {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-// "Class at a glance" (CLASS-9), at the top of an open class row: the next 3 things due, the
+// Who teaches the class (CLASS-9), as a quiet line under an open row's name: "Taught by Dr. Smith ·
+// Message in Canvas". More than two teachers: "+N more", with every name on hover.
+function TaughtBy({ teachers, messageUrl }) {
+  if (!teachers.length && !messageUrl) return null;
+  const shown = teachers.slice(0, 2).map((t) => t.name).join(", ");
+  return (
+    <div className="flex min-w-0 items-center gap-1.5 text-xs" style={{ color: MUTED }}>
+      {teachers.length > 0 && (
+        <span className="min-w-0 truncate" title={teachers.map((t) => t.name).join("\n")}>
+          Taught by <span className="font-bold" style={{ color: "var(--ink-soft)" }}>{shown}</span>
+          {teachers.length > 2 && ` +${teachers.length - 2} more`}
+        </span>
+      )}
+      {teachers.length > 0 && messageUrl && <span aria-hidden="true">·</span>}
+      {messageUrl && (
+        <a href={messageUrl} target="_blank" rel="noreferrer" className="text-link flex shrink-0 items-center gap-1 font-bold" style={{ color: "var(--ink-soft)" }}>
+          Message in Canvas
+          <OutArrow />
+        </a>
+      )}
+    </div>
+  );
+}
+
+// One goal sentence for an open row (CLASS-11), from the same plan as the grade calculator:
+// "To finish with 90% (A-), you'd need about 94% on the rest."
+function GoalLine({ course, breakdown, goal }) {
+  const s = goalSentence(breakdown, goal, course.score === null || course.score === undefined ? null : Number(course.score));
+  return (
+    <div className="flex items-center gap-3.5 rounded-[14px] bg-[var(--surface-2)] px-3.5 py-3">
+      <span className="c-tint c-text grid h-[34px] w-[34px] shrink-0 place-items-center rounded-[10px]" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="8.5" />
+          <circle cx="12" cy="12" r="4.5" />
+          <circle cx="12" cy="12" r="0.8" fill="currentColor" />
+        </svg>
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
+        <span className="text-[13.5px] font-bold leading-[1.35]" style={{ color: INK }}>
+          {s.line}
+        </span>
+        <span className="text-xs leading-[1.35]" style={{ color: MUTED }}>
+          {s.sub}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function CalcIcon() {
+  return (
+    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="5" y="3" width="14" height="18" rx="3" />
+      <path d="M8.5 7h7M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01M8.5 15h.01M12 15h.01M15.5 15h.01" />
+    </svg>
+  );
+}
+
+// "Class at a glance" (CLASS-9), at the top of an open class row: the next 3 things due and the
 // newest announcement (both open in Quick look; opening an announcement marks it read, as
-// everywhere), who teaches the class with a Canvas Inbox link, and the course home.
-function ClassGlance({ course, glance, data, now, readIds, onLookItem, onLookAnnouncement }) {
+// everywhere). Who teaches it sits under the class name (TaughtBy); the Canvas links sit with the
+// row's buttons.
+function ClassGlance({ glance, now, readIds, onLookItem, onLookAnnouncement }) {
   const label = "text-[10.5px] font-extrabold uppercase tracking-[0.07em]";
   const a = glance.announcement;
-  const teachers = data?.breakdown?.teachers || [];
-  const messageUrl = data?.breakdown?.messageUrl || "";
   const unread = a && !readIds?.has(a.id);
   return (
     <div className="flex flex-col gap-2 border-b border-[var(--chip)] pb-2.5">
@@ -691,33 +776,6 @@ function ClassGlance({ course, glance, data, now, readIds, onLookItem, onLookAnn
         </div>
       </div>
 
-      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 px-1.5 text-xs" style={{ color: "var(--ink-soft)" }}>
-        {teachers.length > 0 && (
-          <span className="flex min-w-0 items-center gap-1.5" title={teachers.map((t) => t.name).join("\n")}>
-            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ color: MUTED }}>
-              <circle cx="12" cy="8" r="4" />
-              <path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" />
-            </svg>
-            <span className="min-w-0 truncate">
-              <span style={{ color: MUTED }}>{teachers.length === 1 ? "Teacher" : "Teachers"}: </span>
-              <span className="font-bold" style={{ color: INK }}>
-                {teachers.slice(0, 2).map((t) => t.name).join(", ")}
-              </span>
-              {teachers.length > 2 && ` +${teachers.length - 2} more`}
-            </span>
-          </span>
-        )}
-        {messageUrl && (
-          <a href={messageUrl} target="_blank" rel="noreferrer" className="text-link flex shrink-0 items-center gap-1 font-bold underline" style={{ color: INK }}>
-            Message in Canvas
-            <OutArrow />
-          </a>
-        )}
-        <a href={course.homeUrl} target="_blank" rel="noreferrer" className="text-link ml-auto flex shrink-0 items-center gap-1 font-bold underline" style={{ color: INK }}>
-          Open in Canvas
-          <OutArrow />
-        </a>
-      </div>
     </div>
   );
 }
@@ -774,120 +832,10 @@ function CategoryLine({ c, weighted }) {
         <span className="truncate" title={c.name}>{c.name}</span>
       </span>
       {weighted && <span style={{ color: "var(--ink-soft)" }}>{fmtPct(c.weight, Number.isInteger(c.weight) ? 0 : 1)}</span>}
-      <span style={{ color: "var(--ink-soft)" }}>
-        {c.gradedCount} of {c.count}
-      </span>
+      <span style={{ color: c.count ? "var(--ink-soft)" : MUTED }}>{c.count ? `${c.gradedCount} of ${c.count}` : "Not posted yet"}</span>
       <span className="text-right font-extrabold" style={{ color: INK }}>
-        {c.percent === null ? "–" : fmtPct(c.percent)}
+        {c.percent === null ? "–" : fmtPct(c.percent, Number.isInteger(Math.round(c.percent * 10) / 10) ? 0 : 1)}
       </span>
     </>
-  );
-}
-
-// The quick What-if inside an open row: pick one assignment that isn't graded yet, type a score,
-// see the new grade. Same math as the What-if pop-up (lib/gradeMath.js). "Full What-if" opens it.
-function QuickWhatIf({ course, breakdown, exam, goal, now, onWhatIf }) {
-  const options = useMemo(() => {
-    const list = breakdown.groups.flatMap((g) => g.assignments).filter((a) => !a.graded && !a.excused && a.points > 0);
-    const t = (a) => (a.dueAt ? new Date(a.dueAt).getTime() : Infinity);
-    return list.sort((a, b) => t(a) - t(b));
-  }, [breakdown]);
-  // Starts on the class's next exam when it's a Canvas assignment, else the next thing due.
-  const first = useMemo(() => {
-    const examId = exam?.item?.plannableId;
-    const byExam = examId !== undefined && options.find((a) => String(a.id) === String(examId));
-    return byExam || options.find((a) => a.dueAt && new Date(a.dueAt).getTime() >= (now || 0)) || options[0] || null;
-  }, [options, exam, now]);
-  const [pickedId, setPickedId] = useState(null);
-  const [value, setValue] = useState(course.score === null || course.score === undefined ? "" : String(Math.round(course.score)));
-  const inputId = useId();
-
-  const target = options.find((a) => String(a.id) === String(pickedId)) || first;
-  const v = value === "" ? null : Number(value);
-  const whatIf = target && v !== null && Number.isFinite(v) ? { [target.id]: (target.points * v) / 100 } : {};
-  const result = target && v !== null && Number.isFinite(v) ? computeGrade(breakdown, whatIf) : null;
-  const rest = goal !== null && target && v !== null && Number.isFinite(v) ? averageNeeded(breakdown, whatIf, goal) : null;
-
-  // The goal is the final grade (CLASS-8): "To finish with 90% (A-), you'd need about 95% on the rest."
-  const finish = goal === null ? "" : `To finish with ${goalWords(goal, letterScale(breakdown.scheme))}`;
-  let goalLine;
-  if (goal === null) goalLine = "Set a goal to see what the rest of the class needs.";
-  else if (!rest) goalLine = `${finish}: type a score to see what the rest needs.`;
-  else if (rest.kind === "needed") goalLine = `${finish}, you'd need about ${Math.ceil(rest.percent - 1e-9)}% on the rest.`;
-  else if (rest.kind === "locked") goalLine = `${finish}, you'd be there even with zeros on the rest.`;
-  else if (rest.kind === "impossible") goalLine = `${finish}: out of reach even with 100% on the rest.`;
-  else if (rest.kind === "none") goalLine = `${finish}: nothing else is left to grade.`;
-  else goalLine = `${finish}: not enough graded work yet to tell.`;
-
-  const due = target?.dueAt ? new Date(target.dueAt) : null;
-
-  return (
-    <div className="flex flex-col gap-2 rounded-[14px] bg-[var(--surface-2)] px-3 py-2.5">
-      {options.length === 0 ? (
-        <p className="text-xs" style={{ color: "var(--ink-soft)" }}>
-          Everything in this class is already graded.
-        </p>
-      ) : (
-        <div className="flex flex-wrap items-center gap-2.5">
-          <span className="c-text text-[11px] font-extrabold uppercase tracking-[0.07em]">What if</span>
-          <select
-            value={target ? String(target.id) : ""}
-            onChange={(e) => setPickedId(e.target.value)}
-            aria-label="Assignment to try a score on"
-            className="h-8 min-w-0 max-w-[230px] flex-1 truncate rounded-lg bg-[var(--surface)] px-2.5 text-[13px] font-bold"
-            style={{ color: INK }}
-          >
-            {options.map((a) => (
-              <option key={a.id} value={String(a.id)}>
-                {a.name}
-              </option>
-            ))}
-          </select>
-          {due && (
-            <span className="text-xs font-semibold" style={{ color: MUTED }}>
-              {due.toLocaleDateString(undefined, { weekday: "short" })} {due.getMonth() + 1}/{due.getDate()}
-            </span>
-          )}
-          <span className="relative ml-auto inline-flex">
-            <label htmlFor={inputId} className="sr-only">
-              Score in percent
-            </label>
-            <input
-              id={inputId}
-              type="number"
-              inputMode="decimal"
-              min="0"
-              step="any"
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              className="h-8 w-[74px] rounded-[9px] bg-[var(--surface)] pl-2.5 pr-6 text-sm font-extrabold tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              style={{ color: INK }}
-            />
-            <span className="pointer-events-none absolute right-2.5 top-[7px] text-[13px] font-bold" style={{ color: MUTED }}>
-              %
-            </span>
-          </span>
-          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ color: MUTED }}>
-            <path d="M5 12h14M13 6l6 6-6 6" />
-          </svg>
-          <span className="font-display min-w-[4.2rem] text-right text-lg font-extrabold tabular-nums" style={{ color: INK }} aria-live="polite">
-            {result === null ? "–" : `${result.toFixed(1)}%`}
-          </span>
-        </div>
-      )}
-      <div className="flex flex-wrap items-center gap-2 text-xs" style={{ color: "var(--ink-soft)" }}>
-        {options.length > 0 && <span className="min-w-0 flex-1">{goalLine}</span>}
-        {options.length === 0 && <span className="flex-1" />}
-        <button onClick={onWhatIf} className="btn btn-secondary h-7 rounded-lg px-2.5 text-xs">
-          Full What-if
-        </button>
-        <a href={course.gradesUrl} target="_blank" rel="noreferrer" className="btn btn-soft h-7 rounded-lg bg-[var(--surface)] px-2.5 text-xs">
-          Grades
-          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[11px] w-[11px]" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M7 17L17 7M9 7h8v8" />
-          </svg>
-        </a>
-      </div>
-    </div>
   );
 }

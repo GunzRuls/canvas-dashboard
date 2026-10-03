@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import WeekStrip from "./WeekStrip";
 import QuickAdd from "./QuickAdd";
-import WhatIfPanel from "./WhatIfPanel";
+import GradeCalculator from "./GradeCalculator";
 import ManageClasses from "./ManageClasses";
 import EmptyState from "./EmptyState";
 import UpdateNotice from "./UpdateNotice";
@@ -161,7 +161,7 @@ export default function Dashboard({
   const [toast, setToast] = useState(null);
   const [dragKey, setDragKey] = useState(null);
   const [dropTarget, setDropTarget] = useState(null);
-  const [whatIfCourse, setWhatIfCourse] = useState(null);
+  const [calc, setCalc] = useState(null); // { course, goal } while the grade calculator is open
   const [managing, setManaging] = useState(false);
   const [sendingDigest, setSendingDigest] = useState(false);
   const [dismissedIds, setDismissedIds] = useState(new Set());
@@ -545,7 +545,7 @@ export default function Dashboard({
     : "\u00A0";
   const filteredCourse = filter ? courseById[filter] : null;
 
-  // Two tabs (DASH-17) share this shell: the top bar, the pop-ups (Search, Quick look, What-if,
+  // Two tabs (DASH-17) share this shell: the top bar, the pop-ups (Search, Quick look, Grade calculator,
   // Manage classes) and the toast. On wide windows (xl) each tab fits one screen and its panels
   // scroll on their own; narrower windows stack the pieces and the page scrolls.
   // Today: a left sidebar (Next class + Grades) beside a slim 7-day strip over [board | Incoming].
@@ -619,7 +619,7 @@ export default function Dashboard({
             readIds={readIds}
             onLookItem={lookItem}
             onLookAnnouncement={lookAnnouncement}
-            onWhatIf={setWhatIfCourse}
+            onCalculator={(course, goal) => setCalc({ course, goal })}
           />
         </div>
       )}
@@ -668,7 +668,7 @@ export default function Dashboard({
                     active={filter === c.id}
                     dimmed={Boolean(filter) && filter !== c.id}
                     onSelect={() => setFilter(filter === c.id ? null : c.id)}
-                    onWhatIf={() => setWhatIfCourse(c)}
+                    onCalculator={(goal) => setCalc({ course: c, goal })}
                     newGrades={gradesByCourse[c.id] || []}
                     onSeen={(list) => markGradesSeen(list)}
                   />
@@ -677,7 +677,7 @@ export default function Dashboard({
             )}
             {courses.length > 0 && (
               <p className="hidden flex-none px-2 pb-0.5 pt-1.5 text-[11.5px] leading-snug xl:block" style={{ color: MUTED }}>
-                Check in, What-if and Grades show when you point at a class.
+                Check in, Calculator and Grades show when you point at a class.
               </p>
             )}
           </section>
@@ -858,7 +858,13 @@ export default function Dashboard({
         onLookItem={lookItem}
         onLookAnnouncement={lookAnnouncement}
       />
-      {whatIfCourse &&<WhatIfPanel course={whatIfCourse} onClose={() => setWhatIfCourse(null)} />}
+      {calc && (
+        <GradeCalculator
+          course={{ ...calc.course, code: displayCode(calc.course) }}
+          goal={calc.goal}
+          onClose={() => setCalc(null)}
+        />
+      )}
       {look && (
         <QuickLook
           key={`${look.type}-${look.id}`}
@@ -973,11 +979,11 @@ function formatNumber(n) {
 
 // One class in the sidebar's Grades list (CLASS-8), compact so every class fits under Next class:
 // a ring with the goal tick, the name (opens the course home) and the "N new" chip, then code ·
-// grade and the goal pill. Check in / What-if / Grades show only while you point at the row or
+// grade and the goal pill. Check in / Calculator / Grades show only while you point at the row or
 // are inside it with the keyboard (.grade-actions in globals.css). Clicking the row anywhere that
 // isn't a link or button focuses the page on this class. New grades and the goal picker open
 // inline, so the list can scroll without cutting them off.
-function GradeRow({ course, active, dimmed, onSelect, onWhatIf, newGrades, onSeen }) {
+function GradeRow({ course, active, dimmed, onSelect, onCalculator, newGrades, onSeen }) {
   const [open, setOpen] = useState(false);
   const [goalOpen, setGoalOpen] = useState(false);
   const goalPillRef = useRef(null);
@@ -1083,8 +1089,9 @@ function GradeRow({ course, active, dimmed, onSelect, onWhatIf, newGrades, onSee
             Check in
           </a>
         )}
-        <button onClick={onWhatIf} className={`${chip} bg-[var(--surface-2)]`} style={{ color: "var(--ink-soft)" }}>
-          What-if
+        <button onClick={() => onCalculator(g.goal)} className={`${chip} flex items-center gap-1 bg-[var(--surface-2)]`} style={{ color: "var(--ink-soft)" }}>
+          <CalcIcon />
+          Calculator
         </button>
         <a href={course.gradesUrl} target="_blank" rel="noreferrer" className={`${chip} bg-[var(--surface-2)]`} style={{ color: "var(--ink-soft)" }}>
           Grades
@@ -1489,5 +1496,15 @@ function Empty({ text }) {
     <p className="rounded-xl bg-[var(--surface-2)] p-5 text-center text-sm" style={{ color: MUTED }}>
       {text}
     </p>
+  );
+}
+
+// A small calculator for the Grades row's Calculator chip.
+function CalcIcon() {
+  return (
+    <svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="5" y="3" width="14" height="18" rx="3" />
+      <path d="M8.5 7h7M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01M8.5 15h.01M12 15h.01M15.5 15h.01" />
+    </svg>
   );
 }

@@ -13,6 +13,26 @@ const TONES = {
   plain: { background: "var(--chip)", color: "var(--ink)" },
 };
 
+const GOAL_EVENT = "dashboard-goal-saved";
+
+// Saves one class's goal (null removes it) through POST /api/settings, then tells every row
+// showing that class. Returns true when it saved.
+export async function saveGoal(courseId, value) {
+  const next = cleanGoal(value);
+  try {
+    const res = await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ goals: { [courseId]: next } }),
+    });
+    if (!(await res.json()).ok) throw new Error();
+    window.dispatchEvent(new CustomEvent(GOAL_EVENT, { detail: { courseId, goal: next } }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // The goal for one class: saved through POST /api/settings (only this class's goal changes),
 // and the outlook (what's left) loaded from /api/goals only when a goal is set or `want` is true
 // (the picker is open: its presets need the class's letter scale).
@@ -41,24 +61,23 @@ export function useGradeGoal(course, want = false) {
     };
   }, [needed, course.id, course.score]);
 
-  async function save(value) {
-    const next = cleanGoal(value);
-    const before = goal;
-    setGoal(next);
-    setError("");
-    try {
-      const res = await fetch("/api/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ goals: { [course.id]: next } }),
-      });
-      if (!(await res.json()).ok) throw new Error();
-      return true;
-    } catch {
-      setGoal(before);
-      setError("Couldn't save the goal. Try again.");
-      return false;
+  // A goal saved somewhere else (the other tab's row, the grade calculator) shows here too.
+  useEffect(() => {
+    function onSaved(e) {
+      if (String(e.detail?.courseId) === String(course.id)) setGoal(e.detail.goal);
     }
+    window.addEventListener(GOAL_EVENT, onSaved);
+    return () => window.removeEventListener(GOAL_EVENT, onSaved);
+  }, [course.id]);
+
+  async function save(value) {
+    const before = goal;
+    setGoal(cleanGoal(value));
+    setError("");
+    if (await saveGoal(course.id, value)) return true;
+    setGoal(before);
+    setError("Couldn't save the goal. Try again.");
+    return false;
   }
 
   return {

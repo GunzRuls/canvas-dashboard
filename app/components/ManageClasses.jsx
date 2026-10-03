@@ -9,7 +9,7 @@ const MUTED = "var(--muted)";
 const COLOR_NAMES = ["Grape", "Tangerine", "Lagoon", "Bubblegum", "Cobalt", "Lime", "Sun", "Coral"];
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
 
-// Pop-up plumbing (same as WhatIfPanel): focus moves in, Tab stays inside, Escape closes, the page
+// Pop-up plumbing (same as GradeCalculator): focus moves in, Tab stays inside, Escape closes, the page
 // behind doesn't scroll, and focus returns to the button that opened it.
 function useDialog(ref, onClose) {
   const closeRef = useRef(onClose);

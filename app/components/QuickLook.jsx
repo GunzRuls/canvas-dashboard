@@ -30,7 +30,7 @@ const SUBMIT_LABELS = {
   student_annotation: "Annotation",
 };
 
-// Same pop-up plumbing as What-if: focus moves in, Tab stays inside, Escape closes, the page
+// Same pop-up plumbing as the grade calculator: focus moves in, Tab stays inside, Escape closes, the page
 // behind doesn't scroll, and focus goes back to what opened it.
 function useDialog(ref, onClose) {
   const closeRef = useRef(onClose);

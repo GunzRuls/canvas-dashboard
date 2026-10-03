@@ -17,7 +17,7 @@ export function useSettingsModal() {
 // The Settings pop-up. The dashboard's Settings button is a soft link to /setup, which
 // app/@modal/(.)setup intercepts and shows here, over the dashboard, instead of loading a whole
 // new page. Reloading /setup (or any plain /setup link) still shows the full Settings page.
-// Same plumbing as the What-if and Manage classes pop-ups: focus moves in, Tab stays inside,
+// Same plumbing as the grade calculator and Manage classes pop-ups: focus moves in, Tab stays inside,
 // Escape or a click outside closes it, the page behind doesn't scroll, and focus returns to the
 // Settings button afterwards.
 export default function SettingsModal({ children }) {
