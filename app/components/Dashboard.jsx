@@ -615,6 +615,8 @@ export default function Dashboard({
             items={items}
             status={status}
             headsUp={headsUp}
+            announcements={activeAnnouncements}
+            readIds={readIds}
             onLookItem={lookItem}
             onLookAnnouncement={lookAnnouncement}
             onWhatIf={setWhatIfCourse}

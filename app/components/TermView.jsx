@@ -7,6 +7,7 @@ import { computeGrade, groupTotals, averageNeeded } from "@/lib/gradeMath";
 import { letterScale, letterFor, goalWords } from "@/lib/gradeGoals";
 import { DateTile, countdownStyle, examLink, examTime, Related } from "./HeadsUp";
 import { useGradeGoal, GoalPill, GoalTick, GoalEditor } from "./GradeGoal";
+import { classGlance, dueCountdown } from "@/lib/classGlance";
 
 const INK = "var(--ink)";
 const MUTED = "var(--muted)";
@@ -48,7 +49,7 @@ function Star({ className = "h-[11px] w-[11px]" }) {
 // Right, "My classes": each class's grade, its real Canvas categories as a bar (solid = graded,
 // striped = still to come), its next exam and goal; a row opens to the category table and a quick
 // What-if. Pointing at a class lights up its work on the calendar.
-export default function TermView({ now, courses, items, status, headsUp, onLookItem, onLookAnnouncement, onWhatIf }) {
+export default function TermView({ now, courses, items, status, headsUp, announcements = [], readIds, onLookItem, onLookAnnouncement, onWhatIf }) {
   const [hover, setHover] = useState(null); // course id lit up on the calendar
   const [openId, setOpenId] = useState(null); // the class row that's open
   const breakdowns = useBreakdowns(courses);
@@ -142,6 +143,10 @@ export default function TermView({ now, courses, items, status, headsUp, onLookI
               matched={hover === c.id}
               onHover={() => setHover(c.id)}
               onWhatIf={() => onWhatIf(c)}
+              glance={openId === c.id && now ? classGlance({ courseId: c.id, items, status, announcements, now }) : null}
+              readIds={readIds}
+              onLookItem={onLookItem}
+              onLookAnnouncement={onLookAnnouncement}
             />
           ))}
         </div>
@@ -433,7 +438,7 @@ function fmtPct(n, digits = 0) {
   return `${Number(n).toFixed(digits)}%`;
 }
 
-function ClassRow({ course, data, exam, now, open, onToggle, matched, onHover, onWhatIf }) {
+function ClassRow({ course, data, exam, now, open, onToggle, matched, onHover, onWhatIf, glance, readIds, onLookItem, onLookAnnouncement }) {
   const [goalOpen, setGoalOpen] = useState(false);
   const goalRef = useRef(null);
   const g = useGradeGoal(course, goalOpen);
@@ -559,12 +564,160 @@ function ClassRow({ course, data, exam, now, open, onToggle, matched, onHover, o
 
       {open && (
         <div id={panelId} className="ml-[58px] flex flex-col gap-2.5">
+          {glance && <ClassGlance course={course} glance={glance} data={data} now={now} readIds={readIds} onLookItem={onLookItem} onLookAnnouncement={onLookAnnouncement} />}
           {!data && <p className="text-xs" style={{ color: MUTED }}>Loading this class&apos;s categories…</p>}
           {data?.error && <p className="text-xs" style={{ color: "var(--red-fg)" }}>Couldn&apos;t load this class&apos;s categories from Canvas.</p>}
           {breakdown && <CategoryTable cats={cats} weighted={breakdown.weighted} />}
           {breakdown && <QuickWhatIf course={course} breakdown={breakdown} exam={exam} goal={g.goal} now={now} onWhatIf={onWhatIf} />}
         </div>
       )}
+    </div>
+  );
+}
+
+const TONE = {
+  red: { background: "var(--red-bg)", color: "var(--red-fg)" },
+  amber: { background: "var(--amber-bg)", color: "var(--amber-fg)" },
+  calm: { background: "var(--blue-bg)", color: "var(--blue-fg)" },
+};
+
+function OutArrow() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[10px] w-[10px] shrink-0" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 17L17 7M9 7h8v8" />
+    </svg>
+  );
+}
+
+// "Tue 10/6, 11:59 PM"
+function dueWhen(iso) {
+  const d = new Date(iso);
+  return `${d.toLocaleDateString(undefined, { weekday: "short" })} ${d.getMonth() + 1}/${d.getDate()}, ${d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
+}
+
+function postedAgo(iso, now) {
+  if (!iso) return "";
+  const mins = Math.round((now - new Date(iso).getTime()) / 60000);
+  if (mins < 60) return `${Math.max(mins, 1)} min ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+// "Class at a glance" (CLASS-9), at the top of an open class row: the next 3 things due, the
+// newest announcement (both open in Quick look; opening an announcement marks it read, as
+// everywhere), who teaches the class with a Canvas Inbox link, and the course home.
+function ClassGlance({ course, glance, data, now, readIds, onLookItem, onLookAnnouncement }) {
+  const label = "text-[10.5px] font-extrabold uppercase tracking-[0.07em]";
+  const a = glance.announcement;
+  const teachers = data?.breakdown?.teachers || [];
+  const messageUrl = data?.breakdown?.messageUrl || "";
+  const unread = a && !readIds?.has(a.id);
+  return (
+    <div className="flex flex-col gap-2 border-b border-[var(--chip)] pb-2.5">
+      <div className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <span className={`${label} px-1.5`} style={{ color: MUTED }}>
+            Due next
+          </span>
+          {glance.next.length === 0 && (
+            <p className="px-1.5 py-1 text-xs" style={{ color: "var(--ink-soft)" }}>
+              Nothing left to do in Canvas right now.
+            </p>
+          )}
+          {glance.next.map((i) => {
+            const pill = dueCountdown(new Date(i.dueAt).getTime(), now);
+            const body = (
+              <>
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-[12.5px] font-bold" style={{ color: INK }}>
+                    {i.title}
+                  </span>
+                  <span className="truncate text-[11px] font-semibold" style={{ color: MUTED }}>
+                    {dueWhen(i.dueAt)}
+                  </span>
+                </span>
+                <span className="shrink-0 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[10.5px] font-extrabold" style={TONE[pill.tone]}>
+                  {pill.text}
+                </span>
+              </>
+            );
+            const cls = "flex min-w-0 items-center gap-2 rounded-lg px-1.5 py-1";
+            return i.url ? (
+              <a key={i.key} href={i.url} target="_blank" rel="noreferrer" onClick={(e) => onLookItem(e, i)} className={`${cls} row-hover`} title={i.title}>
+                {body}
+              </a>
+            ) : (
+              <div key={i.key} className={cls} title={i.title}>
+                {body}
+              </div>
+            );
+          })}
+          {glance.more > 0 && (
+            <span className="px-1.5 text-[11px] font-bold" style={{ color: MUTED }}>
+              +{glance.more} more this term
+            </span>
+          )}
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <span className={`${label} px-1.5`} style={{ color: MUTED }}>
+            Latest announcement
+          </span>
+          {a ? (
+            <a href={a.url} target="_blank" rel="noreferrer" onClick={(e) => onLookAnnouncement(e, a)} className="row-hover flex min-w-0 flex-col gap-px rounded-lg px-1.5 py-1" title={a.title}>
+              <span className="flex min-w-0 items-center gap-1.5">
+                {unread && <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-[var(--brand)]" title="Unread" />}
+                <span className="truncate text-[12.5px] font-bold" style={{ color: INK }}>
+                  {a.title}
+                </span>
+              </span>
+              <span className="text-[11px] font-semibold" style={{ color: MUTED }}>
+                {postedAgo(a.postedAt, now)}
+              </span>
+              {a.preview && (
+                <span className="truncate text-[11.5px]" style={{ color: "var(--ink-soft)" }}>
+                  {a.preview}
+                </span>
+              )}
+            </a>
+          ) : (
+            <p className="px-1.5 py-1 text-xs" style={{ color: "var(--ink-soft)" }}>
+              No announcements lately.
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 px-1.5 text-xs" style={{ color: "var(--ink-soft)" }}>
+        {teachers.length > 0 && (
+          <span className="flex min-w-0 items-center gap-1.5" title={teachers.map((t) => t.name).join("\n")}>
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ color: MUTED }}>
+              <circle cx="12" cy="8" r="4" />
+              <path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" />
+            </svg>
+            <span className="min-w-0 truncate">
+              <span style={{ color: MUTED }}>{teachers.length === 1 ? "Teacher" : "Teachers"}: </span>
+              <span className="font-bold" style={{ color: INK }}>
+                {teachers.slice(0, 2).map((t) => t.name).join(", ")}
+              </span>
+              {teachers.length > 2 && ` +${teachers.length - 2} more`}
+            </span>
+          </span>
+        )}
+        {messageUrl && (
+          <a href={messageUrl} target="_blank" rel="noreferrer" className="text-link flex shrink-0 items-center gap-1 font-bold underline" style={{ color: INK }}>
+            Message in Canvas
+            <OutArrow />
+          </a>
+        )}
+        <a href={course.homeUrl} target="_blank" rel="noreferrer" className="text-link ml-auto flex shrink-0 items-center gap-1 font-bold underline" style={{ color: INK }}>
+          Open in Canvas
+          <OutArrow />
+        </a>
+      </div>
     </div>
   );
 }
