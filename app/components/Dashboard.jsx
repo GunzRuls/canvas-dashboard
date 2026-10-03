@@ -528,6 +528,15 @@ export default function Dashboard({
     openLook(e, { kind: "announcement", type: "announcement", courseId: a.courseId, id: a.id, title: a.title, url: a.url, announcement: a });
   }
 
+  // A teacher comment (CLASS-7) opens its assignment: as the board card when it's on the board
+  // (so Start/Done work), otherwise just the assignment.
+  function lookFeedback(e, f) {
+    if (!f.assignmentId) return;
+    const item = items.find((i) => i.type === "assignment" && i.courseId === f.courseId && String(i.plannableId) === String(f.assignmentId));
+    if (item) return lookItem(e, item);
+    openLook(e, { kind: "item", type: "assignment", courseId: f.courseId, id: f.assignmentId, title: f.assignmentTitle, url: f.url });
+  }
+
   // "What's new" (DASH-10): a row opens like a card title click; anything Quick look can't
   // show is left alone, so its link opens in the pop-up window.
   function openChange(e, c) {
@@ -792,13 +801,15 @@ export default function Dashboard({
           </div>
         </section>
 
-        {/* Incoming (DASH-15): Heads up | News (announcements) */}
+        {/* Incoming (DASH-15): Heads up | News (announcements) | Feedback (teacher comments, CLASS-7) */}
         <IncomingPanel
           now={now}
           headsUp={headsUp}
           courses={courses}
+          filter={filter}
           onLookItem={lookItem}
           onLookAnnouncement={lookAnnouncement}
+          onLookFeedback={lookFeedback}
           newsCount={visibleAnnouncements.length}
           clearAll={clearAll}
           news={

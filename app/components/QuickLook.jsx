@@ -253,6 +253,31 @@ function FileList({ files }) {
   );
 }
 
+// What teachers wrote on your graded submission (CLASS-7), plain text, oldest first.
+function TeacherComments({ comments, now }) {
+  return (
+    <section aria-label="Teacher comments">
+      <p className="mb-1.5 text-[11px] font-extrabold uppercase tracking-wide" style={{ color: MUTED }}>
+        Teacher comments <span className="font-bold normal-case tracking-normal">· {comments.length}</span>
+      </p>
+      <ul className="flex flex-col divide-y divide-[var(--line)] overflow-hidden rounded-2xl bg-[var(--surface)]" style={{ boxShadow: "inset 0 0 0 1px var(--line)" }}>
+        {comments.map((c) => (
+          <li key={c.id} className="flex flex-col gap-1 px-4 py-3">
+            <p className="whitespace-pre-line text-sm leading-relaxed" style={{ color: INK }}>
+              {c.text}
+            </p>
+            <p className="text-xs font-semibold" style={{ color: MUTED }}>
+              — {c.author}
+              {c.createdAt ? ` · ${longDate(c.createdAt)}` : ""}
+              {c.createdAt && now ? ` (${relative(c.createdAt, now)})` : ""}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 const ArrowIcon = (
   <svg aria-hidden="true" viewBox="0 0 12 12" className="h-3 w-3">
     <path d="M3.5 2.5h6v6M9.5 2.5 2.5 9.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
@@ -446,6 +471,8 @@ export default function QuickLook({ target, course, now, boardStatus, onMove, on
                 )}
 
                 {look.files?.length > 0 && <FileList files={look.files} />}
+
+                {sub?.comments?.length > 0 && <TeacherComments comments={sub.comments} now={now} />}
               </div>
             )}
           </div>
