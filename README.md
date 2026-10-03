@@ -22,6 +22,7 @@ You need Windows 10 or 11 and Google Chrome or Microsoft Edge. Nothing else.
 - Open it from the **School Dashboard** icon on your desktop or in the Start menu.
 - Close the window when you're done. The dashboard stops in the background by itself shortly after.
 - Change your Canvas token, Google Calendar, or email settings from the **Settings** button.
+- **Moving to another PC?** In **Settings → Move to another PC**, pick a password and click **Save backup file**. Copy the file to the new PC, install the dashboard there, and choose **Restore from a backup** on the first screen. Everything comes back (Canvas, calendars, morning email, class names, colors and times) without setting it up again. The file is locked with your password, which can't be recovered if you forget it.
 
 ## Update or uninstall
 

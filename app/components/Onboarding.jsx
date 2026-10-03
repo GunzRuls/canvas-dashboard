@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Input, CanvasAddressHelp, TokenHelp, GmailHelp, ResendHelp } from "./setupHelp";
 import { CalendarLinkField } from "./CalendarSettings";
 import { ClassTimesRow, EMPTY_TIMES, isBlank, timesProblem } from "./ClassTimes";
+import { RestoreFields, RestoreNotes } from "./BackupSettings";
 import { tourResponse, onboardingStart, sampleClassRows, isSampleValue, TOUR_SAMPLE } from "@/lib/tour";
 
 // First launch: a step-by-step setup instead of one long form. Canvas is required; class times
@@ -14,6 +15,10 @@ import { tourResponse, onboardingStart, sampleClassRows, isSampleValue, TOUR_SAM
 // obviously fake sample data (TOUR_SAMPLE in lib/tour.js), so you can click straight through. Every
 // write goes through `send` below, which answers locally instead of calling the server, the class
 // list is the sample one (no Canvas call), and the theme is only previewed. Nothing is saved.
+//
+// Moving from another PC (SET-4): the first screen and Connect also offer "Restore from a
+// backup" (app/components/BackupSettings.jsx). A restore saves everything at once, so it goes
+// straight to the dashboard, via the class-times step only when the backup has no class times.
 
 const INK = "var(--ink)";
 const MUTED = "var(--muted)";
@@ -61,9 +66,13 @@ export default function Onboarding({ tour = null }) {
   const [theme, setTheme] = useState("system");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [restoring, setRestoring] = useState(false); // showing "Restore from a backup"
+  const [restored, setRestored] = useState(null); // the server's answer after a restore
+  const [restoreDone, setRestoreDone] = useState(false); // showing the "Restored" card
 
   const go = (n) => {
     setError("");
+    setRestoring(false);
     // The theme picker starts on whatever is saved in this browser (read here, not during render,
     // so the server and browser render the same page).
     if (STEPS[n] === "look") setTheme(savedTheme());
@@ -71,6 +80,31 @@ export default function Onboarding({ tour = null }) {
   };
   const next = () => go(step + 1);
   const back = () => go(step - 1);
+
+  // After a restore there's nothing left to set up. Notes (a calendar that didn't load, say) and
+  // the walkthrough get a "Restored" card first; otherwise straight to the dashboard.
+  function finishRestore(data = restored) {
+    if (tour || data?.notes?.length) {
+      setRestoring(false);
+      setRestoreDone(true);
+    } else {
+      // A full page load on purpose: the whole app starts fresh with the restored settings.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.assign("/");
+    }
+  }
+
+  function onRestored(data) {
+    setRestored(data);
+    setConnected({ name: data.name, classes: data.classes });
+    if (data.needsClassTimes && !tour) {
+      // Class times are the one thing a backup might not have: ask for them, then finish.
+      setRestoring(false);
+      setStep(STEPS.indexOf("connect"));
+    } else {
+      finishRestore(data);
+    }
+  }
 
   // Saves through the same checks as Settings. A blank token means "keep the one just saved".
   async function save(extra) {
@@ -151,12 +185,61 @@ export default function Onboarding({ tour = null }) {
         className="mx-auto flex w-full flex-1 flex-col justify-center px-4 py-10"
         style={{ maxWidth: wide ? 840 : 512, transition: "max-width 0.35s ease" }}
       >
-        {step > 0 && step < STEPS.length - 1 && (
+        {step > 0 && step < STEPS.length - 1 && !restoring && !restoreDone && (
           <p className="mb-3 text-xs font-bold uppercase tracking-wide" style={{ color: MUTED }}>
             Step {step} of {STEPS.length - 2}
           </p>
         )}
 
+        {restoring && (
+          <div key="restore" className="step-in">
+            <Card>
+              <Title>Restore from a backup</Title>
+              <Lead>
+                Pick the backup file you saved in Settings on your other PC (Move to another PC), and type its
+                password. Your Canvas connection, calendars, morning email and classes come back as they were.
+              </Lead>
+              <div className="mt-4">
+                <RestoreFields
+                  send={send}
+                  tour={Boolean(tour)}
+                  onRestored={onRestored}
+                  onBack={() => setRestoring(false)}
+                  submitLabel="Restore"
+                >
+                  {tour && <SampleTag>In the walkthrough, any backup file (or none) works. Nothing is opened or saved.</SampleTag>}
+                </RestoreFields>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {restoreDone && !restoring && (
+          <div key="restored" className="step-in">
+            <Card>
+              <p className="text-4xl" aria-hidden="true">
+                🎉
+              </p>
+              <Title>Restored from your backup</Title>
+              <p className="mt-3 text-sm" style={{ color: "var(--ink-soft)" }}>
+                ✓ Canvas connected{restored?.name ? ` as ${restored.name}` : ""}
+                {restored?.classes != null ? ` (${restored.classes} classes)` : ""}
+              </p>
+              <RestoreNotes notes={restored?.notes} />
+              {tour && (
+                <p className="mt-4 rounded-xl px-4 py-3 text-sm font-bold" style={{ background: "var(--brand-tint)", color: "var(--brand-text)" }}>
+                  That was the walkthrough, with sample data. Nothing was restored, and your real settings are unchanged.
+                </p>
+              )}
+              <Actions>
+                {/* eslint-disable-next-line @next/next/no-location-assign-relative-destination */}
+                <Primary onClick={() => window.location.assign("/")}>Open my dashboard</Primary>
+              </Actions>
+            </Card>
+          </div>
+        )}
+
+        {!restoring && !restoreDone && (
         <div key={name} className="step-in">
           {name === "welcome" && (
             <Card>
@@ -183,6 +266,7 @@ export default function Onboarding({ tour = null }) {
                   Takes about 2 minutes
                 </span>
               </Actions>
+              <RestoreLink onClick={() => setRestoring(true)} />
             </Card>
           )}
 
@@ -248,6 +332,7 @@ export default function Onboarding({ tour = null }) {
                     {busy ? "Checking with Canvas…" : "Connect"}
                   </Primary>
                 </Actions>
+                <RestoreLink onClick={() => setRestoring(true)} />
               </Card>
             </form>
           )}
@@ -258,10 +343,11 @@ export default function Onboarding({ tour = null }) {
               send={send}
               connected={connected}
               back={back}
-              skip={next}
+              skip={restored ? () => finishRestore() : next}
               onSaved={(count) => {
                 setClassTimes(count);
-                next();
+                if (restored) finishRestore();
+                else next();
               }}
             />
           )}
@@ -460,8 +546,21 @@ export default function Onboarding({ tour = null }) {
             </Card>
           )}
         </div>
+        )}
       </div>
     </main>
+  );
+}
+
+// "Moving from another PC?" under the first screens.
+function RestoreLink({ onClick }) {
+  return (
+    <p className="mt-4 border-t border-[var(--chip)] pt-4 text-sm" style={{ color: MUTED }}>
+      Moving from another PC?{" "}
+      <button type="button" onClick={onClick} className="text-link font-bold underline" style={{ color: INK }}>
+        Restore from a backup
+      </button>
+    </p>
   );
 }
 

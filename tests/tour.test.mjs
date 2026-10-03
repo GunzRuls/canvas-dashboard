@@ -121,3 +121,15 @@ test("class times 'save' succeeds; any other address is refused", () => {
   assert.deepEqual(tourResponse("/api/settings", { schedule: {}, hidden: [] }), { ok: true });
   assert.equal(tourResponse("/api/digest", {}).ok, false);
 });
+
+test("restoring a backup in the walkthrough opens and saves nothing, and still checks the file's label", () => {
+  const ok = tourResponse("/api/backup/restore", { file: "", password: "" });
+  assert.equal(ok.ok, true);
+  assert.equal(ok.name, TOUR_SAMPLE.name);
+  assert.deepEqual(ok.notes, []);
+  assert.equal(ok.needsClassTimes, false);
+  const file = JSON.stringify({ format: "school-dashboard-backup", version: 1 });
+  assert.equal(tourResponse("/api/backup/restore", { file, password: "anything1" }).ok, true);
+  assert.match(tourResponse("/api/backup/restore", { file, password: "" }).error, /password/);
+  assert.match(tourResponse("/api/backup/restore", { file: "{\"a\":1}", password: "x" }).error, /isn't a School Dashboard backup/);
+});

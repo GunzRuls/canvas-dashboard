@@ -6,6 +6,7 @@ import { Input, CanvasAddressHelp, TokenHelp, GmailHelp, ResendHelp } from "./se
 import { LinkedCalendars, CanvasFeed } from "./CalendarSettings";
 import { Avatar } from "./AccountChip";
 import { useSettingsModal, SettingsModalHeader } from "./SettingsModal";
+import { MoveToAnotherPC } from "./BackupSettings";
 
 const INK = "var(--ink)";
 const MUTED = "var(--muted)";
@@ -118,6 +119,31 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
       setError(err.message);
       return null;
     }
+  }
+
+  // A backup was restored: show what's saved now (the server sends the same safe view as
+  // `saved`), then reload the data behind the form.
+  function restored(data) {
+    const s = data.saved || {};
+    setCanvasBaseUrl(s.canvasBaseUrl || "");
+    setCanvasToken("");
+    setCalendars((s.calendars || []).map((c, index) => ({ ...c, index })));
+    setNewCalendarUrl("");
+    setEmailProvider(s.emailProvider || "gmail");
+    setGmailAddress(s.gmailAddress || "");
+    setGmailAppPassword("");
+    setResendApiKey("");
+    setDigestToEmail(s.digestToEmail || "");
+    setDigestFromEmail(s.digestFromEmail || "");
+    setSendTime(s.sendTime || "07:00");
+    setSendDays(s.sendDays || "weekdays");
+    setEmailOff(!data.emailOn);
+    setTimezone(s.timezone || "");
+    setClear([]);
+    setError("");
+    setTestResult(null);
+    modal?.markSaved();
+    router.refresh();
   }
 
   async function submit(e) {
@@ -391,6 +417,7 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
         </div>
       </form>
 
+      {!firstRun && <MoveToAnotherPC onRestored={restored} />}
       {!firstRun && (
         <section className="settings-card mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl p-5" style={{ background: "var(--surface)" }}>
           <div className="min-w-0">
