@@ -584,7 +584,8 @@ a.headsup-chip-news:hover { background: var(--purple-bg); color: var(--purple-fg
 .seg:hover:not([aria-disabled="true"]):not([aria-selected="true"]) { color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--line-2); }
 .seg[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px var(--menu-shadow); }
 .seg[aria-disabled="true"] { color: var(--muted); cursor: default; }
-.seg-count { min-width: 18px; padding: 1px 6px; border-radius: 9999px; font-size: 11px; font-weight: 800; background: var(--line); color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+/* A fixed-height pill that centers its number, so 1, 12 or 120 all sit in the middle. */
+.seg-count { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; height: 18px; min-width: 18px; padding: 0 5px; border-radius: 9999px; font-size: 11px; font-weight: 800; line-height: 1; background: var(--line); color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 .seg[aria-selected="true"] .seg-count { background: var(--brand); color: #FFFFFF; }
 .seg-soon { padding: 1px 6px; border-radius: 9999px; font-size: 10px; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line-2); }
 .incoming-row { transition: background-color 0.15s; }
