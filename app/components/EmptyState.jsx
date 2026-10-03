@@ -31,6 +31,12 @@ const ICONS = {
       <path d="M15.5 9.5a3.5 3.5 0 0 1 0 5" />
     </>
   ),
+  chat: (
+    <>
+      <path d="M6.5 8.5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v4.5a2 2 0 0 1-2 2h-4l-3 2.5v-2.5h0a2 2 0 0 1-2-2z" />
+      <path d="M9.5 10h5M9.5 12.5h3" />
+    </>
+  ),
 };
 
 const KINDS = {
@@ -38,6 +44,7 @@ const KINDS = {
   doing: { icon: "play", tone: "brand", title: "Nothing in progress", text: "Press Start on a card, or drag one here, when you begin.", pieces: 4 },
   done: { icon: "flag", tone: "brand", title: "Nothing finished yet", text: "Work you complete lands here.", pieces: 4 },
   news: { icon: "megaphone", tone: "purple", title: "You're all caught up", text: "New announcements will show up here.", pieces: 6 },
+  feedback: { icon: "chat", tone: "brand", title: "No teacher comments in the last 30 days", text: "Comments teachers leave on your graded work will show up here.", pieces: 5 },
 };
 
 const TONES = {

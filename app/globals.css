@@ -575,7 +575,7 @@ a.headsup-chip-news:hover { background: var(--purple-bg); color: var(--purple-fg
 .menu-item[aria-checked="true"] .menu-knob { transform: translateX(14px); }
 
 /* DASH-15 Incoming: the Heads up | News | Feedback switch. The picked one is a white pill with a
-   brand count; Feedback is dimmed until it exists. */
+   brand count (Feedback counts new teacher comments). */
 .seg {
   flex: 1 1 auto; min-width: 0; height: 32px; border-radius: 9999px; display: inline-flex; align-items: center; justify-content: center;
   gap: 6px; padding: 0 10px; font-size: 13px; font-weight: 700; white-space: nowrap; color: var(--ink-soft); cursor: pointer;
@@ -586,9 +586,9 @@ a.headsup-chip-news:hover { background: var(--purple-bg); color: var(--purple-fg
 .seg[aria-disabled="true"] { color: var(--muted); cursor: default; }
 .seg-count { min-width: 18px; padding: 1px 6px; border-radius: 9999px; font-size: 11px; font-weight: 800; background: var(--line); color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 .seg[aria-selected="true"] .seg-count { background: var(--brand); color: #FFFFFF; }
-.seg-soon { padding: 1px 6px; border-radius: 9999px; font-size: 10px; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line-2); }
 .incoming-row { transition: background-color 0.15s; }
 .incoming-row:hover { background: var(--hover); }
+.feedback-text:hover > span:last-child { color: var(--ink); text-decoration: underline; }
 .incoming-crunch { transition: box-shadow 0.15s; }
 .incoming-crunch:hover { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--amber-fg) 45%, transparent); }
 .incoming-crunch .headsup-caret { transition: transform 0.18s; }
@@ -623,7 +623,7 @@ a.headsup-chip-news:hover { background: var(--purple-bg); color: var(--purple-fg
 .term-chevron svg { transition: transform 0.18s; }
 .term-chevron[aria-expanded="true"] svg { transform: rotate(180deg); }
 /* The narrower Incoming column (below 1440px) drops the SOON badge so the three tabs fit. */
-@media (max-width: 89.99rem) { .seg { padding: 0 6px; gap: 4px; } .seg-soon { display: none; } }
+@media (max-width: 89.99rem) { .seg { padding: 0 6px; gap: 4px; } }
 
 /* CLASS-10 Grade calculator (GradeCalculator.jsx). --well is the quieter left column. The letter
    buttons outline on hover and fill with the class color (--c) when picked; a row you typed a score
