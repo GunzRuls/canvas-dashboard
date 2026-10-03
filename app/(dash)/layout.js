@@ -54,6 +54,7 @@ export default async function DashboardLayout({ children }) {
       allCourses={data.allCourses}
       items={data.items}
       announcements={data.announcements}
+      clearedAnnouncements={data.clearedAnnouncements}
       events={data.calendar.events}
       calendarEnabled={calendarEnabled()}
       calendarError={data.calendar.error}

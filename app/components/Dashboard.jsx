@@ -122,6 +122,7 @@ export default function Dashboard({
   allCourses,
   items,
   announcements,
+  clearedAnnouncements,
   events = [],
   calendarEnabled = false,
   calendarError = null,
@@ -272,7 +273,10 @@ export default function Dashboard({
   const courseById = useMemo(() => Object.fromEntries(courses.map((c) => [c.id, c])), [courses]);
   // Announcements you haven't cleared with Done (one list, so the hooks below don't redo work).
   const activeAnnouncements = useMemo(() => announcements.filter((a) => !dismissedIds.has(a.id)), [announcements, dismissedIds]);
-  const headsUp = useHeadsUp({ now, items, announcements: activeAnnouncements, events, courses, status });
+  // Heads up reads every announcement, cleared ones too, so clearing the news about an exam
+  // doesn't remove the exam itself.
+  const examAnnouncements = useMemo(() => [...announcements, ...(clearedAnnouncements || [])], [announcements, clearedAnnouncements]);
+  const headsUp = useHeadsUp({ now, items, announcements: examAnnouncements, events, courses, status });
   const colorFor = (courseId) => courseById[courseId]?.color || NEUTRAL_COLOR;
   const nameFor = (courseId, fallback) => courseById[courseId]?.name || fallback || "Personal";
   const codeFor = (courseId) => displayCode(courseById[courseId]);
