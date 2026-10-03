@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { formatSize } from "@/lib/canvasFiles";
+import QuickLookRubric from "./QuickLookRubric";
 
 // Quick look (DASH-9): a pop-up inside the dashboard that shows one assignment, quiz, discussion
 // or announcement: when it's due, points, your submission, the full instructions and files.
@@ -471,6 +472,8 @@ export default function QuickLook({ target, course, now, boardStatus, onMove, on
                 )}
 
                 {look.files?.length > 0 && <FileList files={look.files} />}
+
+                {look.rubric && <QuickLookRubric rubric={look.rubric} />}
 
                 {sub?.comments?.length > 0 && <TeacherComments comments={sub.comments} now={now} />}
               </div>
