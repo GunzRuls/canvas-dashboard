@@ -66,6 +66,8 @@ Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile
 [UninstallDelete]
 ; Files the app creates while running (like its cache).
 Type: filesandordirs; Name: "{app}\app"
+; The last installer the in-app Update button downloaded (lib/updates.js saves it to %TEMP%).
+Type: files; Name: "{localappdata}\Temp\School-Dashboard-Setup-*.exe"
 
 [Code]
 // Stop a running dashboard before its files are replaced during an update.
