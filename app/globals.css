@@ -632,6 +632,8 @@ a.headsup-chip-news:hover { background: var(--purple-bg); color: var(--purple-fg
 .calc-goal { background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--line); cursor: pointer; transition: box-shadow 0.15s, background-color 0.15s; }
 .calc-goal:hover { background: var(--hover); box-shadow: inset 0 0 0 1.5px var(--line-2); }
 .calc-goal[aria-pressed="true"] { background: color-mix(in srgb, var(--c) 14%, var(--surface)); color: color-mix(in srgb, var(--c) 70%, var(--ink)); box-shadow: inset 0 0 0 2px var(--c); }
+.calc-goal-chip { background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--line); cursor: pointer; transition: box-shadow 0.15s, background-color 0.15s; }
+.calc-goal-chip:hover { background: var(--hover); box-shadow: inset 0 0 0 1.5px var(--c); }
 .calc-cap { font-size: 11px; font-weight: 700; letter-spacing: 0.4px; color: var(--muted); }
 .calc-icon-btn { color: var(--muted); transition: background-color 0.15s, color 0.15s; }
 .calc-icon-btn:hover { background: var(--surface-2); color: var(--ink); }

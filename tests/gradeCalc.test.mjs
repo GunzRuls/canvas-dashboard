@@ -16,8 +16,11 @@ import {
   leftOutNote,
   letterChoices,
   lockValue,
+  openStatusText,
   scoreText,
   solvePlan,
+  standing,
+  toComeText,
   up1,
   withArticle,
 } from "../lib/gradeCalc.js";
@@ -256,4 +259,65 @@ test("This term goal sentence uses the same plan", () => {
   assert.match(goalSentence(weighted, 96, 80).line, /out of reach: even 100% on the rest ends at 95\.0%/);
   assert.match(goalSentence(weighted, 20, 80).line, /^You've already locked in 20%/);
   assert.match(goalSentence(weighted, null).line, /^No goal yet/);
+});
+
+// CLASS-14: "Where you stand", the calculator's opening view before a goal is picked.
+test("standing: weighted class facts, category averages and bounds", () => {
+  const s = standing(calcModel(weighted));
+  assert.equal(s.graded, 1); // h1 (excused h3, the 0% survey and extra credit don't count)
+  assert.equal(s.open, 2); // Essay + the exam placeholder
+  assert.equal(s.unposted, 1);
+  assert.equal(s.waiting, 0);
+  close(s.a0, 20, "a0"); // same bounds as the plan
+  close(s.a1, 95, "a1");
+  assert.deepEqual(s.categories.map((c) => c.name), ["Homework", "Exam"]);
+  const [hw, exam] = s.categories;
+  close(hw.pct, 80, "homework average"); // 80 / 100 graded
+  assert.equal(hw.left, 1);
+  close(hw.done, 0.5, "homework graded share"); // 100 of 200 points graded
+  assert.equal(exam.pct, null); // nothing graded yet
+  assert.equal(exam.unposted, true);
+  assert.equal(exam.left, 0);
+  assert.equal(exam.done, 0);
+  assert.equal(toComeText(s), "2 still to come: 1 not posted yet.");
+});
+
+test("standing: points class and submitted / missing work", () => {
+  const cls = {
+    weighted: false,
+    groups: [
+      {
+        id: "a",
+        name: "Assignments",
+        weight: 0,
+        assignments: [graded("a1", 40, 50), { ...open("a2", 50), submitted: true }, { ...open("a3", 50), missing: true }, open("a4", 50)],
+      },
+    ],
+  };
+  const s = standing(calcModel(cls));
+  assert.equal(s.graded, 1);
+  assert.equal(s.open, 3);
+  assert.equal(s.waiting, 1);
+  assert.equal(s.missing, 1);
+  close(s.categories[0].pct, 80, "average"); // 40 / 50
+  close(s.categories[0].done, 0.25, "graded share"); // 50 of 200 points
+  close(s.a0, 20, "a0"); // 40 / 200
+  close(s.a1, 95, "a1"); // 190 / 200
+  assert.equal(toComeText(s), "3 still to come: 1 turned in and waiting for a grade, 1 marked missing.");
+});
+
+test("standing: nothing to show and everything graded", () => {
+  assert.equal(standing(null).a0, null);
+  const all = standing(calcModel({ weighted: false, groups: [{ id: "a", name: "A", weight: 0, assignments: [graded("a1", 9, 10)] }] }));
+  assert.equal(all.open, 0);
+  close(all.a0, 90, "finished");
+  assert.equal(toComeText(all), "Nothing left to come. Everything is graded.");
+});
+
+test("open row status text", () => {
+  assert.equal(openStatusText({ placeholder: true }), "Not posted yet");
+  assert.equal(openStatusText({ submitted: true }), "Submitted · waiting for a grade");
+  assert.equal(openStatusText({ submitted: true, late: true }), "Submitted late · waiting for a grade");
+  assert.equal(openStatusText({ missing: true }), "Marked missing in Canvas");
+  assert.equal(openStatusText({}), "Not graded yet");
 });
