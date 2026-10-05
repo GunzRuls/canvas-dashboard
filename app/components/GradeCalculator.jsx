@@ -39,6 +39,10 @@ import { saveGoal } from "./GradeGoal";
 const MUTED = "var(--muted)";
 const SOFT = "var(--ink-soft)";
 const HELP_KEY = "dashboard-calc-help-seen";
+// The last column of section (3): a label slot and the guess box, the same in every row, so the
+// "Suggested" / "Your guess" labels, the boxes and graded scores all sit at the same x.
+const SCORE_W = 186;
+const SCORE_CELL = "grid grid-cols-[minmax(0,1fr)_84px] items-center gap-2.5";
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
 
 // Pop-up plumbing: focus moves into the dialog, Tab stays inside it, Escape closes it, the page
@@ -264,7 +268,9 @@ export default function GradeCalculator({ course, goal = null, onClose }) {
   const anyGraded = model ? [...model.groups, ...model.zeroGroups].some((g) => g.graded.length) : false;
   const gradedOn = showGraded && anyGraded;
   const needHead = !goalMode ? "Score / status" : gradedOn ? "Score or your guess" : "Your guess";
-  const cols = ["minmax(0,1fr)", goalMode ? "96px" : "108px", details ? "86px" : null, goalMode ? "196px" : "minmax(132px,auto)"].filter(Boolean).join(" ");
+  // One grid for the header and every row, in both modes, so the columns line up from the header
+  // down through every category card. Fixed tracks only: an "auto" track would size per row.
+  const cols = ["minmax(0,1fr)", "92px", details ? "80px" : null, `${SCORE_W}px`].filter(Boolean).join(" ");
   const note = leftOutNote(model);
   const counts = countsLine(model, plan);
   const meterRed = out.kind === "impossible" || out.kind === "outWithGuesses" || (out.kind === "allTyped" && !out.reached);
@@ -517,7 +523,7 @@ export default function GradeCalculator({ course, goal = null, onClose }) {
 
                 {/* Same side padding and scrollbar gutter as the list below, so the columns line up. */}
                 <div className="shrink-0 overflow-hidden pl-5 pr-3 [scrollbar-gutter:stable] sm:pl-7 sm:pr-5">
-                  <div className="calc-cols grid items-end gap-x-4 border-b border-[var(--line)] px-[13px] pb-2" style={{ gridTemplateColumns: cols }}>
+                  <div className="calc-cols grid items-end gap-x-3 border-b border-[var(--line)] px-[13px] pb-2" style={{ gridTemplateColumns: cols }}>
                     <span className="calc-cap">Assignment</span>
                     <span className="calc-cap">Due</span>
                     {details && <span className="calc-cap text-right">Share of final</span>}
@@ -537,7 +543,7 @@ export default function GradeCalculator({ course, goal = null, onClose }) {
                     <div key={g.id} className="flex shrink-0 flex-col overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)]">
                       <CategoryHeader g={g} weighted={model.weighted} />
                       <div className="flex flex-col px-3 py-1.5">
-                        {showGraded && g.graded.map((r) => <GradedRow key={r.id} r={r} cols={cols} details={details} />)}
+                        {showGraded && g.graded.map((r) => <GradedRow key={r.id} r={r} cols={cols} details={details} goalMode={goalMode} />)}
                         {g.open.map((it) =>
                           g.zero ? (
                             <ZeroRow key={it.id} it={it} cols={cols} details={details} />
@@ -677,7 +683,7 @@ function ItemRow({ it, group, cols, plan, goalMode = true, reachedAll, details, 
   // Where you stand (CLASS-14): the item's status instead of a score box.
   if (!goalMode) {
     return (
-      <div className="row-hover -mx-2 grid min-h-12 items-center gap-x-4 rounded-[10px] px-2 py-1.5" style={{ gridTemplateColumns: cols }}>
+      <div className="row-hover -mx-2 grid min-h-12 items-center gap-x-3 rounded-[10px] px-2 py-1.5" style={{ gridTemplateColumns: cols }}>
         <div className="flex min-w-0 flex-col gap-px">
           <span className="text-[13.5px] font-semibold leading-snug [overflow-wrap:anywhere]">{it.name.replaceAll("/", "/​")}</span>
           {it.placeholder && (
@@ -695,7 +701,7 @@ function ItemRow({ it, group, cols, plan, goalMode = true, reachedAll, details, 
           </span>
         )}
         <span
-          className="text-right text-[12.5px] font-bold leading-snug"
+          className="text-right text-[12.5px] font-bold leading-snug [text-wrap:balance]"
           style={{ color: it.submitted ? "var(--brand-text)" : it.missing ? "var(--red-fg)" : MUTED }}
         >
           {openStatusText(it)}
@@ -734,7 +740,7 @@ function ItemRow({ it, group, cols, plan, goalMode = true, reachedAll, details, 
   const tip = `${it.name}: ${it.placeholder ? "not posted yet" : `${pts} points`}, worth ${it.share.toFixed(1)}% of your final grade`;
   return (
     <div
-      className={`${mine ? "c-tint" : "row-hover"} -mx-2 grid min-h-12 items-center gap-x-4 rounded-[10px] px-2 py-1.5`}
+      className={`${mine ? "c-tint" : "row-hover"} -mx-2 grid min-h-12 items-center gap-x-3 rounded-[10px] px-2 py-1.5`}
       style={{ gridTemplateColumns: cols }}
       title={tip}
     >
@@ -756,7 +762,7 @@ function ItemRow({ it, group, cols, plan, goalMode = true, reachedAll, details, 
           {it.share.toFixed(1)}%
         </span>
       )}
-      <div className="flex items-center justify-end gap-2.5">
+      <div className={SCORE_CELL}>
         <span className="flex min-w-0 flex-col items-end text-right leading-tight">
           <span className={`whitespace-nowrap text-[11.5px] font-extrabold ${markerClass}`} style={markerColor ? { color: markerColor } : undefined}>
             {marker}
@@ -765,7 +771,7 @@ function ItemRow({ it, group, cols, plan, goalMode = true, reachedAll, details, 
             {sub}
           </span>
         </span>
-        <span className="relative inline-flex shrink-0">
+        <span className="relative inline-flex">
           <input
             inputMode="decimal"
             autoComplete="off"
@@ -957,10 +963,10 @@ function Spacers({ details }) {
 const num = (n) => `${+Number(n).toFixed(2)}`;
 
 // A graded (or excused) assignment: read-only and dimmed, with the real score (CLASS-13).
-function GradedRow({ r, cols, details }) {
+function GradedRow({ r, cols, details, goalMode }) {
   return (
     <div
-      className="row-hover -mx-2 grid min-h-9 items-center gap-x-4 rounded-[10px] px-2 py-1"
+      className="row-hover -mx-2 grid min-h-9 items-center gap-x-3 rounded-[10px] px-2 py-1"
       style={{ gridTemplateColumns: cols }}
       title={`${r.name}: ${scoreText(r)}`}
     >
@@ -976,22 +982,22 @@ function GradedRow({ r, cols, details }) {
         {r.excused ? "Excused" : "Graded"}
       </span>
       <Spacers details={details} />
-      <div className="flex items-baseline justify-end gap-2 whitespace-nowrap">
-        {r.excused ? (
-          <span className="text-[12.5px] font-semibold" style={{ color: MUTED }}>
-            Doesn&apos;t count
+      {r.excused ? (
+        <span className="text-right text-[12.5px] font-semibold" style={{ color: MUTED }}>
+          Doesn&apos;t count
+        </span>
+      ) : (
+        // Score in the label slot, percent where the guess box sits (in goal mode its text starts
+        // where a typed number does), so graded rows line up with the open rows below them.
+        <div className={`${SCORE_CELL} whitespace-nowrap`}>
+          <span className="text-right text-[13px] font-bold tabular-nums" style={{ color: SOFT }}>
+            {r.pct === null ? `${num(r.score)} pts` : `${num(r.score)} / ${num(r.points)}`}
           </span>
-        ) : (
-          <>
-            <span className="text-[13px] font-bold tabular-nums" style={{ color: SOFT }}>
-              {r.pct === null ? `${num(r.score)} pts` : `${num(r.score)} / ${num(r.points)}`}
-            </span>
-            <span className="w-[50px] text-right text-xs font-semibold tabular-nums" style={{ color: MUTED }}>
-              {r.pct === null ? "" : pct1(r.pct)}
-            </span>
-          </>
-        )}
-      </div>
+          <span className={`${goalMode ? "pl-2.5" : "text-right"} text-xs font-semibold tabular-nums`} style={{ color: MUTED }}>
+            {r.pct === null ? "" : pct1(r.pct)}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -999,7 +1005,7 @@ function GradedRow({ r, cols, details }) {
 // Open work in a category worth 0%: listed so nothing seems missing, but it needs nothing.
 function ZeroRow({ it, cols, details }) {
   return (
-    <div className="row-hover -mx-2 grid min-h-9 items-center gap-x-4 rounded-[10px] px-2 py-1" style={{ gridTemplateColumns: cols }}>
+    <div className="row-hover -mx-2 grid min-h-9 items-center gap-x-3 rounded-[10px] px-2 py-1" style={{ gridTemplateColumns: cols }}>
       <div className="flex min-w-0 flex-col gap-px">
         <span className="text-[13px] font-semibold leading-snug [overflow-wrap:anywhere]" style={{ color: SOFT }}>
           {it.name.replaceAll("/", "/\u200B")}
