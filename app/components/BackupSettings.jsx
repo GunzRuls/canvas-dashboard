@@ -178,10 +178,15 @@ export function RestoreFields({ send, onRestored, tour = false, danger = false, 
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // MAIL-6: set when the backup has the morning email; the next submit carries the answer.
+  const [askEmail, setAskEmail] = useState(null); // { sendTime, sendDays }
+  const [emailHere, setEmailHere] = useState(false); // "No, keep it on my other PC" is the default
 
   async function pick(e) {
     const chosen = e.target.files?.[0];
     setError("");
+    setAskEmail(null);
+    setEmailHere(false);
     if (!chosen) return;
     if (chosen.size > MAX_FILE) {
       setFile(null);
@@ -197,7 +202,13 @@ export function RestoreFields({ send, onRestored, tour = false, danger = false, 
     if (file && !password) return setError("Type the password you picked when you saved the backup.");
     setBusy(true);
     try {
-      const data = await send("/api/backup/restore", { file: file?.text || "", password });
+      const data = await send("/api/backup/restore", {
+        file: file?.text || "",
+        password,
+        ...(askEmail ? { emailHere } : {}),
+      });
+      // Nothing was saved yet: show the question, then Restore again sends the answer.
+      if (data.askEmail) return setAskEmail({ sendTime: data.sendTime, sendDays: data.sendDays });
       if (!data.ok) throw new Error(data.error || "That didn't restore.");
       setPassword("");
       onRestored(data);
@@ -228,6 +239,7 @@ export function RestoreFields({ send, onRestored, tour = false, danger = false, 
         aria-label="Backup password"
       />
       {children}
+      {askEmail && <EmailHereQuestion ask={askEmail} value={emailHere} onChange={setEmailHere} />}
       {error && <ErrorNote text={error} />}
       <div className={`flex flex-wrap items-center gap-2 ${onBack ? "mt-3" : ""}`}>
         {onBack && (
@@ -244,6 +256,51 @@ export function RestoreFields({ send, onRestored, tour = false, danger = false, 
         </button>
       </div>
     </form>
+  );
+}
+
+// "7:00 AM" from "07:00".
+function clock(hhmm) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || ""));
+  if (!m) return "";
+  const h = Number(m[1]);
+  return `${h % 12 || 12}:${m[2]} ${h < 12 ? "AM" : "PM"}`;
+}
+
+// MAIL-6: a backup with the morning email would otherwise send it from both PCs.
+function EmailHereQuestion({ ask, value, onChange }) {
+  const when = clock(ask.sendTime);
+  const options = [
+    [false, "No, keep it on my other PC", "The email stays set up here, so the Email summary button still works. You can switch later in Settings."],
+    [true, "Yes, send from this PC", `This PC will send it${when ? ` at ${when}` : ""}${ask.sendDays === "daily" ? " every day" : " on weekdays"}. Turn it off on the other PC, or you'll get two.`],
+  ];
+  return (
+    <fieldset className="step-in flex flex-col gap-2 rounded-xl p-4" style={{ background: "var(--surface-2)" }}>
+      <legend className="sr-only">Send the morning email from this PC too?</legend>
+      <p className="text-sm font-extrabold" style={{ color: INK }} aria-hidden="true">
+        Send the morning email from this PC too?
+      </p>
+      <p className="text-sm" style={{ color: MUTED }}>
+        Your backup has the morning email set up. If your other PC keeps sending it, you&apos;d get two each morning.
+      </p>
+      {options.map(([v, label, hint]) => (
+        <label
+          key={label}
+          className="settings-card flex cursor-pointer items-start gap-3 rounded-xl px-3 py-2.5"
+          style={{ background: "var(--surface)", outline: value === v ? "2px solid var(--brand)" : undefined }}
+        >
+          <input type="radio" name="email-here" checked={value === v} onChange={() => onChange(v)} className="mt-1" />
+          <span className="text-sm">
+            <span className="block font-bold" style={{ color: INK }}>
+              {label}
+            </span>
+            <span className="block" style={{ color: MUTED }}>
+              {hint}
+            </span>
+          </span>
+        </label>
+      ))}
+    </fieldset>
   );
 }
 

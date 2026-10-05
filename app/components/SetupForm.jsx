@@ -146,6 +146,13 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
     router.refresh();
   }
 
+  // "Send from this PC" / "Stop sending from this PC" saved: show the new state.
+  function pcChanged(data) {
+    if (data.scheduleWarning) setError(`Saved, but ${data.scheduleWarning}`);
+    modal?.markSaved();
+    router.refresh();
+  }
+
   async function submit(e) {
     e.preventDefault();
     setSaving(true);
@@ -247,7 +254,11 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
           note="Optional"
           open={emailOn}
           badge={
-            emailOn && !emailOff ? (
+            emailOn && !emailOff && saved.emailHere === false ? (
+              <span className="rounded-full px-2 py-0.5 text-xs font-bold" style={{ background: "var(--surface-2)", color: "var(--ink-soft)" }}>
+                Paused on this PC
+              </span>
+            ) : emailOn && !emailOff ? (
               <Suspense fallback={<span className="settings-skeleton inline-block h-5 w-28 rounded-full" style={{ background: "var(--surface-2)" }} aria-hidden="true" />}>
                 <EmailSchedule nextEmail={nextEmail} />
               </Suspense>
@@ -272,6 +283,7 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
             </>
           ) : (
             <>
+              {emailOn && <EmailThisPc here={saved.emailHere !== false} sendTime={saved.sendTime} sendDays={saved.sendDays} onChanged={pcChanged} />}
               <div className="flex gap-1 self-start rounded-xl p-1" style={{ background: "var(--surface-2)" }} role="radiogroup" aria-label="Send with">
                 {[
                   ["gmail", "Gmail (recommended)"],
@@ -313,6 +325,7 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
                 <>
                   <p className="text-sm" style={{ color: MUTED }}>
                     Sent through a free Resend account.
+                    {!digestFromEmail && " Resend sends from onboarding@resend.dev; choose Gmail to send from your own address."}
                   </p>
                   <Field label="Resend API key" help={<ResendHelp />}>
                     <Input
@@ -362,7 +375,7 @@ export default function SetupForm({ saved, firstRun, installed, version, fixToke
               </div>
               <p className="text-xs" style={{ color: MUTED }}>
                 It sends even with the dashboard closed, as long as your PC is on. If the PC was off at that time, it
-                sends when you turn it on.
+                sends when you turn it on and says it&apos;s late.
               </p>
 
               <div className="flex flex-wrap items-center gap-2">
@@ -544,6 +557,62 @@ function Maintenance({ installed, version }) {
         </p>
       )}
     </section>
+  );
+}
+
+// "7:00 AM" from "07:00".
+function clockLabel(hhmm) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || ""));
+  if (!m) return "";
+  const h = Number(m[1]);
+  return `${h % 12 || 12}:${m[2]} ${h < 12 ? "AM" : "PM"}`;
+}
+
+// MAIL-6: whether THIS computer sends the morning email. After restoring a backup on a second PC
+// the email is set up but paused here (another PC sends it), so you don't get two.
+function EmailThisPc({ here, sendTime, sendDays, onChanged }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const when = `${clockLabel(sendTime)}${sendDays === "daily" ? " every day" : " on weekdays"}`;
+
+  async function change(next) {
+    setBusy(true);
+    setError("");
+    try {
+      const res = await fetch("/api/email-pc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ here: next }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Couldn't change that.");
+      onChanged(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return here ? (
+    <p className="text-sm" style={{ color: "var(--ink-soft)" }}>
+      <b style={{ color: INK }}>This PC sends your morning email at {when}.</b>{" "}
+      <button type="button" onClick={() => change(false)} disabled={busy} className="text-link font-bold underline" style={{ color: MUTED }}>
+        {busy ? "Changing…" : "Stop sending from this PC"}
+      </button>
+      {error && <span role="alert" className="block font-bold" style={{ color: "var(--red-fg)" }}>{error}</span>}
+    </p>
+  ) : (
+    <div className="flex flex-wrap items-center gap-3 rounded-xl px-4 py-3" style={{ background: "var(--surface-2)" }}>
+      <p className="min-w-0 flex-1 text-sm" style={{ color: "var(--ink-soft)" }}>
+        <b style={{ color: INK }}>This PC doesn&apos;t send the morning email</b> (another PC does). The Email summary
+        button still works here.
+      </p>
+      <button type="button" onClick={() => change(true)} disabled={busy} className="btn btn-secondary flex-none px-4 py-2 text-sm">
+        {busy ? "Setting up…" : "Send from this PC"}
+      </button>
+      {error && <p role="alert" className="w-full text-sm font-bold" style={{ color: "var(--red-fg)" }}>{error}</p>}
+    </div>
   );
 }
 

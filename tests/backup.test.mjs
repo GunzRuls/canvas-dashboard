@@ -170,3 +170,14 @@ test("cleared teacher comments travel in the backup; only Canvas comment ids are
   const { payload: oldOpened } = await decryptBackup(old, PASSWORD);
   assert.deepEqual(oldOpened.dismissed.feedbackDone, []);
 });
+
+test("which PC sends the morning email never goes in a backup (MAIL-6)", async () => {
+  assert.ok(!BACKUP_CONFIG_KEYS.includes("digestOnThisPc"));
+  const withFlag = buildBackupPayload({ config: { ...config, digestOnThisPc: "yes" }, settings, dismissed });
+  assert.equal("digestOnThisPc" in withFlag.config, false);
+  assert.deepEqual(withFlag, payload);
+  // A hand-made file that adds it is cleaned on the way in.
+  const file = await encryptBackup({ ...payload, config: { ...payload.config, digestOnThisPc: "yes" } }, PASSWORD);
+  const opened = await decryptBackup(file, PASSWORD);
+  assert.equal("digestOnThisPc" in opened.payload.config, false);
+});

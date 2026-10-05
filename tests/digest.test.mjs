@@ -342,3 +342,48 @@ test("note: Canvas text is escaped everywhere", () => {
   });
   assert.doesNotMatch(html, /<script>|<b>Class|<i>X|javascript:/);
 });
+
+// ---- MAIL-5: a scheduled send that's late ----
+const LATE_SAME_DAY = { late: true, daysAgo: 0, clock: "9:30 AM", weekday: "Wednesday" };
+
+test("late: subject says (sent late), greeting fits the time, and a line says when it was due", () => {
+  const evening = Date.parse("2026-09-30T23:00:00Z"); // 7:00 PM EDT
+  const { subject, html } = note({ items: [item("Quiz 2", at(30))] }, { now: evening, firstName: "Joel", late: LATE_SAME_DAY });
+  assert.match(subject, / \(sent late\)$/);
+  assert.match(html, />Good evening, Joel\.</);
+  assert.doesNotMatch(html, /Good morning/);
+  assert.match(html, /This was due at 9:30 AM but your PC was off or asleep, so it&#39;s coming now\./);
+  assert.doesNotMatch(html, /up to date/);
+  // the line is muted text with a dark-mode class, like the rest of the email
+  assert.match(html, /<p class="em-muted em-late"/);
+});
+
+test("late: afternoon greeting; the next day says yesterday; older says the weekday", () => {
+  const afternoon = Date.parse("2026-09-30T17:30:00Z"); // 1:30 PM EDT
+  assert.match(note({}, { now: afternoon, late: LATE_SAME_DAY }).html, />Good afternoon\.</);
+  const morningAfter = Date.parse("2026-10-01T12:00:00Z"); // Thu 8:00 AM EDT
+  const yesterday = note({}, { now: morningAfter, late: { late: true, daysAgo: 1, clock: "7:00 AM", weekday: "Wednesday" } }).html;
+  assert.match(yesterday, />Good morning\.</);
+  assert.match(yesterday, /This was due yesterday at 7:00 AM but your PC was off or asleep, so it&#39;s coming now\. Everything below is up to date\./);
+  const monday = note({}, { now: morningAfter, late: { late: true, daysAgo: 3, clock: "7:00 AM", weekday: "Friday" } }).html;
+  assert.match(monday, /This was due Friday at 7:00 AM/);
+});
+
+test("not late: on-time sends and the Email summary button keep Good morning and the usual subject", () => {
+  const evening = Date.parse("2026-09-30T23:00:00Z");
+  for (const late of [undefined, null, { late: false, daysAgo: 0, clock: "7:00 AM" }]) {
+    const { subject, html } = note({}, { now: evening, late });
+    assert.doesNotMatch(subject, /sent late/);
+    assert.match(html, />Good morning\.</);
+    assert.doesNotMatch(html, /em-late|was due/);
+  }
+});
+
+test("late: banner and brochure get the subject; banner greets for the time of day", () => {
+  const evening = Date.parse("2026-09-30T23:00:00Z");
+  const banner = build({}, { now: evening, late: LATE_SAME_DAY });
+  const brochure = build({}, { now: evening, late: LATE_SAME_DAY, style: "brochure" });
+  assert.match(banner.subject, /\(sent late\)$/);
+  assert.equal(banner.subject, brochure.subject);
+  assert.match(banner.html, />Good evening · Wednesday, September 30</);
+});

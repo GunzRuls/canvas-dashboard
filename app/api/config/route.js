@@ -3,6 +3,7 @@ import { normalShow } from "@/lib/calendarKind";
 import { fromThisApp } from "@/lib/sameOrigin";
 import { digestEnabled, gmailTransport, gmailErrorMessage } from "@/lib/digest";
 import { scheduleDigest } from "@/lib/schedule";
+import { flagAfterSave, taskChange } from "@/lib/emailPc";
 import {
   canvasAddress,
   calendarLinks,
@@ -78,13 +79,19 @@ export async function POST(request) {
       }
     }
 
+    // MAIL-6: turning the email on here means this PC sends it; other saves keep this PC's choice.
+    const enabled = digestEnabled(next);
+    const wasEnabled = digestEnabled(current);
+    next.digestOnThisPc = flagAfterSave({ wasOn: wasEnabled, isOn: enabled, flag: current.digestOnThisPc });
+
     saveConfig(next);
 
-    // Create, change, or remove the daily email task when its settings changed.
-    const enabled = digestEnabled(next);
+    // Create, change, or remove the daily email task when its settings changed (only on the PC
+    // that sends the email).
     let scheduleWarning = "";
-    if (enabled !== digestEnabled(current) || next.sendTime !== current.sendTime || next.sendDays !== current.sendDays) {
-      await scheduleDigest({ sendTime: next.sendTime, sendDays: next.sendDays, enabled }).catch((error) => {
+    const task = taskChange({ before: current, after: next, enabledBefore: wasEnabled, enabledAfter: enabled });
+    if (task.needed) {
+      await scheduleDigest({ sendTime: next.sendTime, sendDays: next.sendDays, enabled: task.enabled }).catch((error) => {
         scheduleWarning = error.message;
       });
     }

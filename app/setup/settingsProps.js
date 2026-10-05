@@ -11,7 +11,7 @@ const NEXT_EMAIL_TTL = 60 * 1000;
 const nextEmailCache = { key: "", at: 0, value: null };
 
 function cachedNextDigestRun(saved) {
-  const key = [saved.emailProvider, saved.sendTime, saved.sendDays, saved.timezone].join("|");
+  const key = [saved.emailProvider, saved.sendTime, saved.sendDays, saved.timezone, saved.emailHere].join("|");
   if (nextEmailCache.value && nextEmailCache.key === key && Date.now() - nextEmailCache.at < NEXT_EMAIL_TTL) {
     return nextEmailCache.value;
   }

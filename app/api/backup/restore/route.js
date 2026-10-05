@@ -5,6 +5,7 @@ import { fromThisApp } from "@/lib/sameOrigin";
 import { normalShow } from "@/lib/calendarKind";
 import { digestEnabled, gmailTransport, gmailErrorMessage } from "@/lib/digest";
 import { scheduleDigest } from "@/lib/schedule";
+import { flagAfterRestore, taskChange } from "@/lib/emailPc";
 import { decryptBackup, BackupError, MAX_BACKUP_BYTES } from "@/lib/backup";
 import {
   canvasAddress,
@@ -24,6 +25,9 @@ export const dynamic = "force-dynamic";
 // that don't pass are left out and reported, and the rest is restored. Secrets are saved through
 // saveConfig, so they're locked with this PC's Windows protection.
 // The password and the file come in the POST body only and are never logged.
+// MAIL-6: when the backup has the morning email, the first answer is { askEmail: true } (nothing
+// saved yet) and the page asks "Send the morning email from this PC too?". It sends the same
+// request again with `emailHere` (true/false); anything but true keeps the email paused here.
 
 function fail(error, status = 400) {
   return Response.json({ ok: false, error }, { status });
@@ -70,8 +74,12 @@ export async function POST(request) {
     return fail(error instanceof BackupError ? error.message : "That file couldn't be opened.");
   }
 
+  const backup = payload.config;
+  if (backup.emailProvider && typeof body.emailHere !== "boolean") {
+    return Response.json({ ok: false, askEmail: true, sendTime: backup.sendTime || "07:00", sendDays: backup.sendDays || "weekdays" });
+  }
+
   try {
-    const backup = payload.config;
     const current = getConfig();
     const notes = [];
     // Every config field is set from the backup (or a default): it replaces what is here.
@@ -142,14 +150,18 @@ export async function POST(request) {
       next.timezone = "America/New_York";
     }
 
+    // MAIL-6: this PC sends the email only if you said yes; the backup never carries this.
+    const emailOn = digestEnabled(next);
+    next.digestOnThisPc = flagAfterRestore({ emailOn, sendHere: body.emailHere });
+
     saveConfig(next);
     await replaceSettings(payload.settings);
     await replaceDismissed(payload.dismissed);
 
     // Same rule as saving email settings: set up, change, or remove the daily Windows task.
-    const emailOn = digestEnabled(next);
-    if (emailOn !== digestEnabled(current) || next.sendTime !== current.sendTime || next.sendDays !== current.sendDays) {
-      await scheduleDigest({ sendTime: next.sendTime, sendDays: next.sendDays, enabled: emailOn }).catch((error) => {
+    const task = taskChange({ before: current, after: next, enabledBefore: digestEnabled(current), enabledAfter: emailOn });
+    if (task.needed) {
+      await scheduleDigest({ sendTime: next.sendTime, sendDays: next.sendDays, enabled: task.enabled }).catch((error) => {
         notes.push(`Restored, but ${error.message}`);
       });
     }

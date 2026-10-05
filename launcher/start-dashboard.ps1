@@ -226,10 +226,17 @@ if ($SendDigest) {
     # The Origin header marks this as the dashboard's own request (see proxy.js).
     $origin = "http://127.0.0.1:$Port"
     try {
+        # scheduled = this is the daily send, so the app can tell when it's running late (MAIL-5).
         $res = Invoke-WebRequest -Method Post -Uri "$origin/api/digest" -Headers @{ Origin = $origin } `
-            -UseBasicParsing -TimeoutSec 120
+            -ContentType "application/json" -Body '{"scheduled":true}' -UseBasicParsing -TimeoutSec 120
         $data = $res.Content | ConvertFrom-Json
-        Write-EmailLog "Sent to $($data.to)."
+        if ($data.skipped) {
+            Write-EmailLog "Not sent. $($data.reason)"
+        } elseif ($data.late) {
+            Write-EmailLog "Sent late to $($data.to)."
+        } else {
+            Write-EmailLog "Sent to $($data.to)."
+        }
     } catch {
         # Windows PowerShell hides the response on errors; read the app's own message from it.
         $detail = $null
