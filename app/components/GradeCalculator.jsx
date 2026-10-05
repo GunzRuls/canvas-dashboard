@@ -1,8 +1,9 @@
 "use client";
 
 // Grade calculator (CLASS-10), the pop-up that replaced What-if. Left: (1) pick the final grade you
-// want, (2) one plain answer with two bars. Right: (3) what each open assignment needs, grouped by
-// category, and (4) an optional "I expect" box per row that re-solves the rest. The math is in
+// want, (2) one plain answer with two bars. Right: (3) every assignment grouped by category: graded
+// ones (dimmed, with the score; CLASS-13) above what each open one needs, and (4) an optional
+// "I expect" box per open row that re-solves the rest. The math is in
 // lib/gradeCalc.js (tested); this file only loads the class and draws. Nothing here touches Canvas;
 // "Save as my goal" saves the goal like the goal picker does.
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -10,13 +11,16 @@ import { GOAL_PRESETS, letterFor, letterScale } from "@/lib/gradeGoals";
 import {
   bestReachable,
   calcModel,
+  countsLine,
   defaultTarget,
   goalText,
+  groupSummary,
   halfUp,
   leftOutNote,
   letterChoices,
   lockValue,
   pct1,
+  scoreText,
   solvePlan,
   trim,
   up1,
@@ -106,6 +110,7 @@ export default function GradeCalculator({ course, goal = null, onClose }) {
   const [locks, setLocks] = useState({}); // { itemId: "85" } from the "I expect" boxes
   const [fineTune, setFineTune] = useState(false);
   const [details, setDetails] = useState(false);
+  const [showGraded, setShowGraded] = useState(true); // graded rows in (3) (CLASS-13)
   const [saved, setSaved] = useState(goal);
   const [saveState, setSaveState] = useState(""); // "" | "saving" | "saved" | "error"
   const [help, setHelp] = useState(() => {
@@ -247,12 +252,18 @@ export default function GradeCalculator({ course, goal = null, onClose }) {
   let listHint = `To finish with ${words}, aim for these scores.`;
   if (plan.kind === "impossible") listHint = `Even full marks on all of these leave you short of ${trim(goalNum)}%. Pick a goal you can reach to see real targets.`;
   else if (reachedAll) listHint = `You've reached ${words} whatever you score on these.`;
+  else if (plan.kind === "set" && !plan.open) listHint = "Everything here is graded.";
   else if (plan.kind === "set") listHint = `With the scores you typed, you finish below ${words}.`;
   else if (plan.kind === "unknown") listHint = "Canvas hasn't graded enough yet to work out targets.";
   else if (hasLocks) listHint = `To finish with ${words}. Rows you typed a score for are marked.`;
-  const needHead = plan.kind === "impossible" ? "Best you can do" : "You need";
+  const anyGraded = model ? [...model.groups, ...model.zeroGroups].some((g) => g.graded.length) : false;
+  const gradedOn = showGraded && anyGraded;
+  const needHead = gradedOn
+    ? plan.kind === "impossible" ? "You got / best" : "You got / need"
+    : plan.kind === "impossible" ? "Best you can do" : "You need";
   const cols = ["minmax(0,1fr)", fineTune ? "96px" : "108px", fineTune ? "80px" : null, details ? "86px" : null, "132px"].filter(Boolean).join(" ");
   const note = leftOutNote(model);
+  const counts = countsLine(model, plan);
 
   let ftSub = "Type a score you expect, and we work out what the rest need.";
   if (fineTune) {
@@ -430,6 +441,11 @@ export default function GradeCalculator({ course, goal = null, onClose }) {
                       color={plan.kind === "impossible" ? "var(--red-fg)" : "var(--c)"}
                     />
                   </div>
+                  {counts && (
+                    <p className="text-[12.5px] font-semibold leading-[1.45]" style={{ color: SOFT }}>
+                      {counts}
+                    </p>
+                  )}
                   {showRange && (
                     <p className="text-xs leading-[1.45] tabular-nums" style={{ color: MUTED }}>
                       Lowest you could finish: {pct1(plan.a0)} (a 0 on everything left). Highest: {pct1(plan.a1)} (100% on everything left).
@@ -443,14 +459,21 @@ export default function GradeCalculator({ course, goal = null, onClose }) {
                 <div className="flex shrink-0 items-start gap-2.5 px-5 pb-2.5 pt-6 sm:px-7">
                   <StepNumber n={3} />
                   <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
-                    <h3 className="font-display text-[17px] font-extrabold leading-6 tracking-[-0.2px]">What each one needs</h3>
+                    <h3 className="font-display text-[17px] font-extrabold leading-6 tracking-[-0.2px]">Your work, graded and still to come</h3>
                     <p className="text-[12.5px] leading-[1.4]" style={{ color: MUTED }}>
                       {listHint}
                     </p>
                   </div>
-                  <button onClick={() => setDetails(!details)} aria-pressed={details} className="text-link mt-0.5 shrink-0 rounded-md px-0.5 py-1 text-[12.5px] font-bold" style={{ color: MUTED }}>
-                    {details ? "Hide details" : "Show details"}
-                  </button>
+                  <div className="mt-0.5 flex shrink-0 items-center gap-3">
+                    {anyGraded && (
+                      <button onClick={() => setShowGraded(!showGraded)} aria-pressed={showGraded} className="text-link rounded-md px-0.5 py-1 text-[12.5px] font-bold" style={{ color: MUTED }}>
+                        {showGraded ? "Hide graded" : "Show graded"}
+                      </button>
+                    )}
+                    <button onClick={() => setDetails(!details)} aria-pressed={details} className="text-link rounded-md px-0.5 py-1 text-[12.5px] font-bold" style={{ color: MUTED }}>
+                      {details ? "Hide details" : "Show details"}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="calc-cols mx-5 grid shrink-0 items-end gap-x-4 border-b border-[var(--line)] pb-2 sm:mx-7" style={{ gridTemplateColumns: cols }}>
@@ -462,43 +485,52 @@ export default function GradeCalculator({ course, goal = null, onClose }) {
                 </div>
 
                 <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-4 pl-5 pr-3 pt-1 [scrollbar-gutter:stable] sm:pl-7 sm:pr-5">
-                  {model.groups.filter((g) => g.open.length).length === 0 && (
+                  {!model.groups.length && !model.zeroGroups.length && (
                     <p className="py-6 text-sm" style={{ color: SOFT }}>
-                      {model.groups.length ? "Nothing is left to grade in this class." : "Canvas doesn't list any assignments or categories for this class yet."}
+                      Canvas doesn&apos;t list any assignments or categories for this class yet.
                     </p>
                   )}
-                  {model.groups
-                    .filter((g) => g.open.length)
-                    .map((g) => (
+                  {[...model.groups, ...model.zeroGroups].map((g) => {
+                    const sum = groupSummary(g, model.weighted);
+                    return (
                       <div key={g.id} className="flex shrink-0 flex-col">
                         {/* Long category names wrap onto a second line instead of being cut off. */}
                         <div className="flex min-h-10 items-baseline gap-2 pb-1.5 pt-3.5">
                           <span className="min-w-0 flex-1 leading-snug">
-                            <span className="text-[13px] font-extrabold">{g.name}</span>{" "}
+                            <span className="text-[13px] font-extrabold" style={g.zero ? { color: SOFT } : undefined}>
+                              {g.name}
+                            </span>{" "}
                             <span className="text-[12.5px] font-semibold" style={{ color: MUTED }}>
-                              · {model.weighted ? `counts for ${trim(g.weight)}% of your grade` : `${trim(g.possible)} points in all`}
+                              · {sum.weight}
+                              {sum.graded && ` · ${sum.graded}`}
                             </span>
                           </span>
                           <span className="shrink-0 text-xs font-semibold" style={{ color: MUTED }}>
-                            {g.open.length} left
+                            {sum.left}
                           </span>
                         </div>
-                        {g.open.map((it) => (
-                          <ItemRow
-                            key={it.id}
-                            it={it}
-                            group={g}
-                            cols={cols}
-                            plan={plan}
-                            reachedAll={reachedAll}
-                            fineTune={fineTune}
-                            details={details}
-                            typed={locks[it.id] ?? ""}
-                            onType={(v) => setLock(it.id, v)}
-                          />
-                        ))}
+                        {showGraded && g.graded.map((r) => <GradedRow key={r.id} r={r} cols={cols} fineTune={fineTune} details={details} />)}
+                        {g.open.map((it) =>
+                          g.zero ? (
+                            <ZeroRow key={it.id} it={it} cols={cols} fineTune={fineTune} details={details} />
+                          ) : (
+                            <ItemRow
+                              key={it.id}
+                              it={it}
+                              group={g}
+                              cols={cols}
+                              plan={plan}
+                              reachedAll={reachedAll}
+                              fineTune={fineTune}
+                              details={details}
+                              typed={locks[it.id] ?? ""}
+                              onType={(v) => setLock(it.id, v)}
+                            />
+                          )
+                        )}
                       </div>
-                    ))}
+                    );
+                  })}
                   {note && (
                     <p className="mt-3.5 shrink-0 rounded-xl bg-[var(--surface-2)] px-3.5 py-3 text-[12.5px] leading-[1.45]" style={{ color: SOFT }}>
                       <b className="font-bold">Not in this list:</b> {note}
@@ -680,6 +712,7 @@ function ItemRow({ it, group, cols, plan, reachedAll, fineTune, details, typed, 
             Not posted yet, counts as one item worth {trim(group.weight)}%
           </span>
         )}
+        <OpenStatus it={it} />
       </div>
       <span className="text-[12.5px] font-semibold leading-snug" style={{ color: it.dueAt ? SOFT : MUTED }}>
         {it.placeholder ? "Not posted yet" : dueText(it.dueAt)}
@@ -715,6 +748,102 @@ function ItemRow({ it, group, cols, plan, reachedAll, fineTune, details, typed, 
           {pctText}
         </span>
       </div>
+    </div>
+  );
+}
+
+// Under an open row's name: turned in and waiting for a grade, or marked missing (CLASS-13).
+// Turned-in work still counts as "still to come" in the plan until Canvas has a score.
+function OpenStatus({ it }) {
+  if (it.submitted) {
+    return (
+      <span className="flex items-center gap-1 text-[11.5px] font-semibold leading-snug" style={{ color: "var(--brand-text)" }}>
+        <svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 12.5l4.5 4.5L19 7.5" />
+        </svg>
+        {it.late ? "Submitted late" : "Submitted"} · waiting for a grade
+      </span>
+    );
+  }
+  if (it.missing) {
+    return (
+      <span className="text-[11.5px] font-semibold leading-snug" style={{ color: "var(--red-fg)" }}>
+        Marked missing in Canvas
+      </span>
+    );
+  }
+  return null;
+}
+
+// Empty cells so a read-only row lines up with the "I expect" and "Share of final" columns.
+function Spacers({ fineTune, details }) {
+  return (
+    <>
+      {fineTune && <span />}
+      {details && <span />}
+    </>
+  );
+}
+
+const num = (n) => `${+Number(n).toFixed(2)}`;
+
+// A graded (or excused) assignment: read-only and dimmed, with the real score (CLASS-13).
+function GradedRow({ r, cols, fineTune, details }) {
+  return (
+    <div
+      className="row-hover -mx-2 grid min-h-9 items-center gap-x-4 rounded-[10px] px-2 py-1"
+      style={{ gridTemplateColumns: cols }}
+      title={`${r.name}: ${scoreText(r)}`}
+    >
+      <span className="min-w-0 text-[13px] font-semibold leading-snug [overflow-wrap:anywhere]" style={{ color: SOFT }}>
+        {r.name.replaceAll("/", "/\u200B")}
+      </span>
+      <span className="flex items-center gap-1 text-xs font-bold leading-snug" style={{ color: r.excused ? MUTED : "var(--green-fg)" }}>
+        {!r.excused && (
+          <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 12.5l4.5 4.5L19 7.5" />
+          </svg>
+        )}
+        {r.excused ? "Excused" : "Graded"}
+      </span>
+      <Spacers fineTune={fineTune} details={details} />
+      <div className="flex items-baseline justify-end gap-2 whitespace-nowrap">
+        {r.excused ? (
+          <span className="text-[12.5px] font-semibold" style={{ color: MUTED }}>
+            Doesn&apos;t count
+          </span>
+        ) : (
+          <>
+            <span className="text-[13px] font-bold tabular-nums" style={{ color: SOFT }}>
+              {r.pct === null ? `${num(r.score)} pts` : `${num(r.score)} / ${num(r.points)}`}
+            </span>
+            <span className="w-[50px] text-right text-xs font-semibold tabular-nums" style={{ color: MUTED }}>
+              {r.pct === null ? "" : pct1(r.pct)}
+            </span>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Open work in a category worth 0%: listed so nothing seems missing, but it needs nothing.
+function ZeroRow({ it, cols, fineTune, details }) {
+  return (
+    <div className="row-hover -mx-2 grid min-h-9 items-center gap-x-4 rounded-[10px] px-2 py-1" style={{ gridTemplateColumns: cols }}>
+      <div className="flex min-w-0 flex-col gap-px">
+        <span className="text-[13px] font-semibold leading-snug [overflow-wrap:anywhere]" style={{ color: SOFT }}>
+          {it.name.replaceAll("/", "/\u200B")}
+        </span>
+        <OpenStatus it={it} />
+      </div>
+      <span className="text-[12.5px] font-semibold leading-snug" style={{ color: MUTED }}>
+        {dueText(it.dueAt)}
+      </span>
+      <Spacers fineTune={fineTune} details={details} />
+      <span className="text-right text-[12.5px] font-semibold" style={{ color: MUTED }}>
+        Doesn&apos;t count
+      </span>
     </div>
   );
 }

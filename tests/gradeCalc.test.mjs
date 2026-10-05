@@ -5,14 +5,18 @@ import assert from "node:assert/strict";
 import {
   bestReachable,
   calcModel,
+  countsLine,
   defaultTarget,
   finalAt,
   goalSentence,
   goalText,
+  gradedRows,
+  groupSummary,
   halfUp,
   leftOutNote,
   letterChoices,
   lockValue,
+  scoreText,
   solvePlan,
   up1,
   withArticle,
@@ -172,19 +176,77 @@ test("letters, default goal and best reachable letter", () => {
   assert.equal(goalText(89.5, []), "89.5%");
 });
 
-test("note under the list: graded, 0% and extra credit", () => {
-  assert.equal(
-    leftOutNote(calcModel(weighted)),
-    "Work that's already graded isn't listed. Survey is in a part of the class that counts for 0%, so it doesn't change your grade. Extra Credit is extra credit, so it isn't counted."
-  );
-  const allGraded = {
+test("note under the list: only extra credit is left out now", () => {
+  assert.equal(leftOutNote(calcModel(weighted)), "Extra Credit is extra credit, so it isn't counted.");
+  assert.equal(leftOutNote(calcModel(points)), "");
+});
+
+// CLASS-13: graded work is listed too, with its score, and turned-in work says it's waiting.
+test("graded rows: score, percent, excused, 0-point work", () => {
+  const rows = gradedRows([graded("q2", 76.67, 100, "Quiz 2"), open("q4", 100), excused("q3", 50), graded("att", 3, 0, "Attendance")]);
+  assert.deepEqual(rows.map((r) => r.id), ["q2", "q3", "att"]); // open work isn't a graded row
+  close(rows[0].pct, 76.67, "quiz 2 percent");
+  assert.equal(scoreText(rows[0]), "76.67 / 100 · 76.7%");
+  assert.equal(rows[1].excused, true);
+  assert.equal(scoreText(rows[1]), "Excused, doesn't count");
+  assert.equal(rows[2].pct, null);
+  assert.equal(scoreText(rows[2]), "3 pts");
+  assert.equal(scoreText(gradedRows([graded("a1", 100, 100)])[0]), "100 / 100 · 100.0%");
+});
+
+test("model keeps graded rows per category and 0% categories for the bottom", () => {
+  const m = calcModel(weighted);
+  assert.deepEqual(m.groups[0].graded.map((r) => r.id), ["h1", "h3"]); // graded + excused, Canvas order
+  assert.deepEqual(m.groups[1].graded, []);
+  assert.deepEqual(m.zeroGroups.map((g) => g.name), ["Survey"]);
+  assert.equal(m.zeroGroups[0].zero, true);
+  // The math is unchanged: 0% categories still don't count.
+  close(finalAt(m, 0), 20, "a0");
+});
+
+test("category summary: weight, graded average, what's left", () => {
+  // Algorithms-style quizzes: 70 + 76.67 + 77 of 300 = 74.56% -> "74.6%"
+  const quizzes = {
+    weighted: true,
+    groups: [{ id: "q", name: "Quizzes", weight: 15, assignments: [graded("q1", 70, 100), graded("q2", 76.67, 100), graded("q3", 77, 100), open("q4", 100)] }],
+  };
+  const g = calcModel(quizzes).groups[0];
+  assert.deepEqual(groupSummary(g, true), { weight: "counts for 15%", graded: "3 graded (74.6%)", left: "1 left" });
+  const m = calcModel(weighted);
+  assert.deepEqual(groupSummary(m.groups[0], true), { weight: "counts for 50%", graded: "1 graded (80%)", left: "1 left" }); // excused not counted
+  assert.deepEqual(groupSummary(m.groups[1], true), { weight: "counts for 50%", graded: "", left: "Not posted yet" });
+  assert.deepEqual(groupSummary(m.zeroGroups[0], true), { weight: "doesn't count toward your grade", graded: "", left: "1 left" });
+  const allDone = calcModel({ weighted: true, groups: [{ id: "m", name: "Midterm", weight: 25, assignments: [graded("m1", 63, 90)] }] });
+  assert.deepEqual(groupSummary(allDone.groups[0], true), { weight: "counts for 25%", graded: "1 graded (70%)", left: "All graded" });
+  assert.equal(groupSummary(calcModel(points).groups[0], false).weight, "150 points in all");
+});
+
+test("submitted but not graded: still open in the plan, flagged as waiting", () => {
+  const sub = (id, points) => ({ ...open(id, points), submitted: true });
+  const algo = {
     weighted: true,
     groups: [
-      { id: "m", name: "Midterm 1", weight: 50, assignments: [graded("m1", 63, 90)] },
-      { id: "f", name: "Final", weight: 50, assignments: [open("f1", 100)] },
+      { id: "a", name: "Assignments", weight: 50, assignments: [graded("a1", 100, 100), sub("a2", 100), sub("a3", 100), open("a4", 100)] },
+      { id: "q", name: "Quizzes", weight: 50, assignments: [graded("q1", 70, 100)] },
     ],
   };
-  assert.equal(leftOutNote(calcModel(allGraded)), "Midterm 1 (70%) is already graded."); // 63/90
+  const m = calcModel(algo);
+  assert.deepEqual(m.groups[0].open.map((it) => [it.id, it.submitted]), [["a2", true], ["a3", true], ["a4", false]]);
+  const r = solvePlan(m, 80, {}, 85);
+  assert.equal(r.open, 3); // turned-in work still needs a score
+  // a0 = 50 x 100/400 + 50 x 70/100 = 12.5 + 35 = 47.5; a1 = 50 + 35 = 85; p = 32.5 / 37.5
+  close(r.p, 86.667, "p");
+  assert.equal(countsLine(m, r), "Counts your 2 graded scores; the plan is for the 3 things still to come (2 turned in, waiting for a grade).");
+});
+
+test("counts line: nothing graded, one graded, everything graded", () => {
+  const m = calcModel(weighted);
+  assert.equal(countsLine(m, solvePlan(m, 90)), "Counts your 1 graded score; the plan is for the 2 things still to come.");
+  const fresh = calcModel({ weighted: false, groups: [{ id: "a", name: "A", weight: 0, assignments: [open("a1", 10)] }] });
+  assert.equal(countsLine(fresh, solvePlan(fresh, 90)), "Nothing is graded yet, so the plan is for the one thing still to come.");
+  const done = calcModel({ weighted: false, groups: [{ id: "a", name: "A", weight: 0, assignments: [graded("a1", 9, 10), graded("a2", 8, 10)] }] });
+  assert.equal(countsLine(done, solvePlan(done, 90)), "Counts your 2 graded scores. Nothing is left to plan.");
+  assert.equal(countsLine(calcModel({ weighted: true, groups: [] }), null), "");
 });
 
 test("This term goal sentence uses the same plan", () => {
