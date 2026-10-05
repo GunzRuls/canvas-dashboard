@@ -4,8 +4,10 @@
 // (CLASS-14): no goal picked, (2) shows the grade as it is today and (3) each item's score or status.
 // Picking a grade switches to goal mode. Left: (1) pick the final grade you
 // want, (2) one plain answer with two bars. Right: (3) every assignment grouped by category: graded
-// ones (dimmed, with the score; CLASS-13) above what each open one needs, and (4) an optional
-// "I expect" box per open row that re-solves the rest. The math is in
+// ones (dimmed, with the score; CLASS-13) above the open ones. In goal mode every open row has a
+// score box (CLASS-16): empty, it shows the suggestion in gray (the even percent the untyped rows
+// need); typed, it's your guess and the suggestions re-balance. Guesses live only in this pop-up.
+// The math is in
 // lib/gradeCalc.js (tested); this file only loads the class and draws. Nothing here touches Canvas;
 // "Save as my goal" saves the goal like the goal picker does.
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -16,6 +18,8 @@ import {
   countsLine,
   goalText,
   groupSummary,
+  guessLine,
+  guessOutcome,
   halfUp,
   leftOutNote,
   letterChoices,
@@ -111,8 +115,7 @@ function StepNumber({ n, soft = false }) {
 export default function GradeCalculator({ course, goal = null, onClose }) {
   const [data, setData] = useState(null); // { breakdown } | { error }
   const [target, setTarget] = useState(null); // typed or picked goal (string); null = Where you stand (CLASS-14)
-  const [locks, setLocks] = useState({}); // { itemId: "85" } from the "I expect" boxes
-  const [fineTune, setFineTune] = useState(false);
+  const [locks, setLocks] = useState({}); // { itemId: "85" }: your guesses (CLASS-16), never saved
   const [details, setDetails] = useState(false);
   const [showGraded, setShowGraded] = useState(true); // graded rows in (3) (CLASS-13)
   const [saved, setSaved] = useState(goal);
@@ -167,12 +170,11 @@ export default function GradeCalculator({ course, goal = null, onClose }) {
   const goalNum = tValid ? tNum : saved ?? 90;
   const words = goalText(goalNum, scale);
   const stand = useMemo(() => standing(model), [model]);
-  const fineTuneOn = goalMode && fineTune;
 
   const plan = solvePlan(model, goalNum, locks, current);
-  const before = solvePlan(model, goalNum, {}, current);
-  const typedCount = plan.typed;
-  const hasLocks = typedCount > 0;
+  const out = guessOutcome(model, goalNum, locks, current);
+  const line = guessLine(out, goalNum, scale);
+  const hasLocks = plan.typed > 0;
 
   function pickTarget(v) {
     setTarget(String(v));
@@ -190,7 +192,6 @@ export default function GradeCalculator({ course, goal = null, onClose }) {
   function reset() {
     setTarget(null);
     setLocks({});
-    setFineTune(false);
     setSaveState("");
   }
   async function save() {
@@ -203,90 +204,70 @@ export default function GradeCalculator({ course, goal = null, onClose }) {
   }
 
   // ---- (2) Here's what it takes ----
+  // The big sentence is the same fixed-template line as the result above the list (CLASS-16).
   const curText = current === null ? "" : pct1(current);
+  const guesses = `${plan.typed} guess${plan.typed === 1 ? "" : "es"}`;
   let ans;
-  if (plan.kind === "doable" || plan.kind === "ontrack") {
-    const p = Math.min(100, Math.ceil(plan.p - 1e-9));
-    const rest = hasLocks
-      ? plan.free === 1 ? "the one other thing left" : `the other ${things(plan.free)} left`
-      : plan.free === 1 ? "the one thing still left" : `each of the ${things(plan.free)} still left`;
+  if (out.kind === "plan" || out.kind === "withGuesses") {
     ans = {
-      big: `Score about ${p}% on ${rest}.`,
-      chip: plan.kind === "ontrack" ? "On track" : "Doable",
+      chip: out.pace === "ontrack" ? "On track" : "Doable",
       why:
         current === null
           ? "Nothing is graded yet, so there's no pace to compare with."
-          : plan.kind === "ontrack"
+          : out.pace === "ontrack"
             ? `You're already scoring about that (${curText} so far). Keep it up.`
             : `You can get there. It takes a little more than you've been scoring so far (${curText}).`,
-      tone: current === null ? "plain" : plan.kind === "ontrack" ? "green" : "amber",
+      tone: current === null ? "plain" : out.pace === "ontrack" ? "green" : "amber",
     };
-  } else if (plan.kind === "impossible") {
-    const best = bestReachable(plan.a1, scale);
+  } else if (out.kind === "impossible" || out.kind === "outWithGuesses") {
+    const best = bestReachable(out.a1, scale);
     ans = {
-      big: `Even 100% on everything left ends at ${pct1(plan.a1)}.`,
       chip: "Out of reach",
-      why: best
-        ? `The highest you can reach is ${withArticle(best.label)} (${pct1(plan.a1)}). That's still a strong finish.`
-        : `The highest you can reach is ${pct1(plan.a1)}.`,
+      why:
+        out.kind === "outWithGuesses"
+          ? "Raise a guess, clear your guesses, or pick a lower goal."
+          : best
+            ? `The highest you can reach is ${withArticle(best.label)} (${pct1(out.a1)}). That's still a strong finish.`
+            : `The highest you can reach is ${pct1(out.a1)}.`,
       tone: "red",
       fix: best,
     };
-  } else if (plan.kind === "locked") {
+  } else if (out.kind === "locked") {
     ans = {
-      big: `You've already locked in ${words}.`,
       chip: "Already locked in",
-      why: `Even a 0 on the ${things(plan.free)} left keeps you at ${pct1(plan.a0)} or higher.`,
+      why: `${hasLocks ? "With your guesses, even" : "Even"} a 0 on the ${things(out.free)} left keeps you at ${pct1(out.a0)} or higher.`,
       tone: "green",
     };
-  } else if (plan.kind === "set") {
+  } else if (out.kind === "allTyped") {
     ans = {
-      big: plan.open ? `Your scores finish at ${pct1(plan.finish)}.` : `Everything is graded. You finished at ${pct1(plan.finish)}.`,
-      chip: plan.reached ? "Goal reached" : "Short of goal",
-      why: plan.reached
-        ? `That reaches ${words}.`
-        : plan.open ? `That's below ${words}. Try higher scores, or a different goal.` : `That's below ${words}.`,
-      tone: plan.reached ? "green" : "red",
+      chip: out.reached ? "Goal reached" : "Short of goal",
+      why: out.reached ? `That's with your ${guesses} on everything still to come.` : `Try higher guesses, or a different goal.`,
+      tone: out.reached ? "green" : "red",
     };
+  } else if (out.kind === "graded") {
+    ans = { chip: out.reached ? "Goal reached" : "Short of goal", why: out.reached ? `That reaches ${words}.` : `That's below ${words}.`, tone: out.reached ? "green" : "red" };
   } else {
-    ans = { big: "Not enough graded work yet to work this out.", chip: "Can't tell yet", why: "Once Canvas has some grades or categories, this fills in.", tone: "plain" };
+    ans = { chip: "Can't tell yet", why: "Once Canvas has some grades or categories, this fills in.", tone: "plain" };
   }
-  const showRange = plan.kind === "doable" || plan.kind === "ontrack" || plan.kind === "locked";
+  ans.big = line;
+  const showRange = out.kind === "plan" || out.kind === "withGuesses" || out.kind === "locked";
   const needPct = plan.p;
   const needLabel = hasLocks ? "Needed on the rest" : "Needed from here";
 
-  // ---- (3) What each one needs ----
-  const reachedAll = plan.kind === "locked" || (plan.kind === "set" && plan.reached);
-  let listHint = `To finish with ${words}, aim for these scores.`;
-  if (plan.kind === "impossible") listHint = `Even full marks on all of these leave you short of ${trim(goalNum)}%. Pick a goal you can reach to see real targets.`;
-  else if (reachedAll) listHint = `You've reached ${words} whatever you score on these.`;
-  else if (plan.kind === "set" && !plan.open) listHint = "Everything here is graded.";
-  else if (plan.kind === "set") listHint = `With the scores you typed, you finish below ${words}.`;
-  else if (plan.kind === "unknown") listHint = "Canvas hasn't graded enough yet to work out targets.";
-  else if (hasLocks) listHint = `To finish with ${words}. Rows you typed a score for are marked.`;
-  if (!goalMode) listHint = "Everything as Canvas has it today. Pick a grade on the left to see what each one needs.";
+  // ---- (3) Your work, with a score box on every open row in goal mode ----
+  const reachedAll = out.kind === "locked" || ((out.kind === "allTyped" || out.kind === "graded") && out.reached);
+  const listHint = !goalMode
+    ? "Everything as Canvas has it today. Pick a grade on the left to see what each one needs."
+    : out.kind === "graded"
+      ? "Everything here is graded."
+      : "Gray = suggested. Type your own guess on any row.";
   const anyGraded = model ? [...model.groups, ...model.zeroGroups].some((g) => g.graded.length) : false;
   const gradedOn = showGraded && anyGraded;
-  const needHead = !goalMode
-    ? "Score / status"
-    : gradedOn
-    ? plan.kind === "impossible" ? "You got / best" : "You got / need"
-    : plan.kind === "impossible" ? "Best you can do" : "You need";
-  const cols = ["minmax(0,1fr)", fineTuneOn ? "96px" : "108px", fineTuneOn ? "80px" : null, details ? "86px" : null, goalMode ? "132px" : "minmax(132px,auto)"].filter(Boolean).join(" ");
+  const needHead = !goalMode ? "Score / status" : gradedOn ? "Score or your guess" : "Your guess";
+  const cols = ["minmax(0,1fr)", goalMode ? "96px" : "108px", details ? "86px" : null, goalMode ? "196px" : "minmax(132px,auto)"].filter(Boolean).join(" ");
   const note = leftOutNote(model);
   const counts = countsLine(model, plan);
-
-  let ftSub = "Type a score you expect, and we work out what the rest need.";
-  if (fineTune) {
-    ftSub = 'Type a score in the "I expect" box on any row. The others update.';
-    if (hasLocks) {
-      const was = before.p !== null && (before.kind === "doable" || before.kind === "ontrack") ? ` (was ${up1(before.p).toFixed(1)}% each)` : "";
-      ftSub =
-        plan.free > 0
-          ? `You typed ${things(typedCount).replace("thing", "score")}, so we worked out the other ${plan.free} again${was}.`
-          : `You typed a score for every one, so there's nothing left to work out.`;
-    }
-  }
+  const meterRed = out.kind === "impossible" || out.kind === "outWithGuesses" || (out.kind === "allTyped" && !out.reached);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -489,7 +470,7 @@ export default function GradeCalculator({ course, goal = null, onClose }) {
                 )}
               </div>
 
-              {/* Right: (3) each one, (4) fine-tune */}
+              {/* Right: (3) each one, with a guess box on every open row in goal mode (CLASS-16) */}
               <div className="flex min-h-0 flex-col">
                 <div className="flex shrink-0 items-start gap-2.5 px-5 pb-2.5 pt-6 sm:px-7">
                   <StepNumber n={3} />
@@ -511,12 +492,34 @@ export default function GradeCalculator({ course, goal = null, onClose }) {
                   </div>
                 </div>
 
+                {/* The live result for the guesses (CLASS-16): one fixed-template line, a meter of the
+                    projected finish against the goal, and Clear my guesses. */}
+                {goalMode && out.kind !== "graded" && (
+                  <div className="shrink-0 overflow-hidden pb-3 pl-5 pr-3 [scrollbar-gutter:stable] sm:pl-7 sm:pr-5">
+                  <div className="flex flex-col gap-2 rounded-[14px] bg-[var(--well)] px-3.5 py-3" style={{ boxShadow: "inset 0 0 0 1px var(--line)" }}>
+                    <p className="text-[14px] font-bold leading-snug" style={{ color: meterRed ? "var(--red-fg)" : "var(--ink)" }}>
+                      {line}
+                    </p>
+                    <GoalMeter projected={out.projected} goal={goalNum} red={meterRed} />
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <span className="flex-1 text-xs leading-[1.4]" style={{ color: MUTED }}>
+                        {hasLocks ? `You typed ${guesses}. ` : ""}Guesses aren&apos;t saved.
+                      </span>
+                      {hasLocks && (
+                        <button onClick={() => setLocks({})} className="text-link rounded-md px-0.5 py-0.5 text-[12.5px] font-bold" style={{ color: MUTED }}>
+                          Clear my guesses
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  </div>
+                )}
+
                 {/* Same side padding and scrollbar gutter as the list below, so the columns line up. */}
                 <div className="shrink-0 overflow-hidden pl-5 pr-3 [scrollbar-gutter:stable] sm:pl-7 sm:pr-5">
                   <div className="calc-cols grid items-end gap-x-4 border-b border-[var(--line)] px-[13px] pb-2" style={{ gridTemplateColumns: cols }}>
                     <span className="calc-cap">Assignment</span>
                     <span className="calc-cap">Due</span>
-                    {fineTuneOn && <span className="calc-cap">I expect</span>}
                     {details && <span className="calc-cap text-right">Share of final</span>}
                     <span className="calc-cap text-right">{needHead}</span>
                   </div>
@@ -534,10 +537,10 @@ export default function GradeCalculator({ course, goal = null, onClose }) {
                     <div key={g.id} className="flex shrink-0 flex-col overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)]">
                       <CategoryHeader g={g} weighted={model.weighted} />
                       <div className="flex flex-col px-3 py-1.5">
-                        {showGraded && g.graded.map((r) => <GradedRow key={r.id} r={r} cols={cols} fineTune={fineTuneOn} details={details} />)}
+                        {showGraded && g.graded.map((r) => <GradedRow key={r.id} r={r} cols={cols} details={details} />)}
                         {g.open.map((it) =>
                           g.zero ? (
-                            <ZeroRow key={it.id} it={it} cols={cols} fineTune={fineTuneOn} details={details} />
+                            <ZeroRow key={it.id} it={it} cols={cols} details={details} />
                           ) : (
                             <ItemRow
                               key={it.id}
@@ -547,7 +550,6 @@ export default function GradeCalculator({ course, goal = null, onClose }) {
                               plan={plan}
                               goalMode={goalMode}
                               reachedAll={reachedAll}
-                              fineTune={fineTuneOn}
                               details={details}
                               typed={locks[it.id] ?? ""}
                               onType={(v) => setLock(it.id, v)}
@@ -569,53 +571,6 @@ export default function GradeCalculator({ course, goal = null, onClose }) {
                   )}
                 </div>
 
-                {plan.open > 0 && !goalMode && (
-                  <div className="mx-5 mb-4 flex shrink-0 items-center gap-3 rounded-[14px] bg-[var(--well)] px-3.5 py-3 sm:ml-7" style={{ boxShadow: "inset 0 0 0 1.5px var(--line)" }}>
-                    <StepNumber n={4} soft />
-                    <span className="flex min-w-0 flex-1 flex-col gap-px">
-                      <span className="text-sm font-extrabold" style={{ color: SOFT }}>
-                        Already know a score? Fine-tune it{" "}
-                        <span className="font-semibold" style={{ color: MUTED }}>
-                          (optional)
-                        </span>
-                      </span>
-                      <span className="text-[12.5px]" style={{ color: MUTED }}>
-                        Pick a grade first. Then you can type scores you expect.
-                      </span>
-                    </span>
-                  </div>
-                )}
-                {plan.open > 0 && goalMode && (
-                  <div
-                    className="mx-5 mb-4 flex shrink-0 flex-col gap-2 rounded-[14px] px-3.5 py-3 sm:ml-7"
-                    style={{ boxShadow: `inset 0 0 0 1.5px ${fineTune ? "var(--c)" : "var(--line)"}`, background: fineTune ? "var(--surface)" : "var(--well)" }}
-                  >
-                    <button onClick={() => setFineTune(!fineTune)} aria-expanded={fineTune} className="calc-fold flex w-full items-center gap-3 rounded-xl text-left">
-                      <StepNumber n={4} soft />
-                      <span className="flex min-w-0 flex-1 flex-col gap-px">
-                        <span className="calc-fold-title text-sm font-extrabold">
-                          Already know a score? Fine-tune it{" "}
-                          <span className="font-semibold" style={{ color: MUTED }}>
-                            (optional)
-                          </span>
-                        </span>
-                        <span className="text-[12.5px]" style={{ color: MUTED }}>
-                          {ftSub}
-                        </span>
-                      </span>
-                      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 transition-transform" style={{ color: MUTED, transform: fineTune ? "rotate(180deg)" : undefined }}>
-                        <path d="M6 9l6 6 6-6" />
-                      </svg>
-                    </button>
-                    {fineTune && hasLocks && (
-                      <div className="flex items-center pl-9">
-                        <button onClick={() => setLocks({})} className="text-link ml-auto rounded-md px-0.5 py-1 text-[12.5px] font-bold" style={{ color: MUTED }}>
-                          Clear my scores
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -639,7 +594,7 @@ export default function GradeCalculator({ course, goal = null, onClose }) {
               Reset
             </button>
             <button onClick={save} className="btn btn-primary h-9 px-3.5 text-[13px]" disabled={!breakdown || !goalMode || !tValid || saveState === "saving"}
-              title={goalMode ? undefined : "Pick a grade first"}>
+              title={goalMode ? `Saves ${tValid ? goalText(tNum, scale) : "this"} as your goal for this class. Your guesses aren't saved.` : "Pick a grade first"}>
               Save as my goal
             </button>
             <button onClick={onClose} className="btn btn-secondary h-9 px-3.5 text-[13px]">
@@ -714,48 +669,69 @@ function Bar({ label, value, text, strong = false, color = "var(--line-2)" }) {
   );
 }
 
-function ItemRow({ it, group, cols, plan, goalMode = true, reachedAll, fineTune, details, typed, onType }) {
+function ItemRow({ it, group, cols, plan, goalMode = true, reachedAll, details, typed, onType }) {
   const lock = lockValue(typed);
   const mine = goalMode && lock !== null;
-  let need = "";
-  let pctText = "";
-  let needStyle = {};
-  let pctStyle = { fontSize: 12, fontWeight: 600, color: MUTED };
+  const bad = goalMode && typed !== "" && lock === null; // typed, but not a usable percent
+  const pts = trim(it.points);
+  // Where you stand (CLASS-14): the item's status instead of a score box.
   if (!goalMode) {
-    // Where you stand (CLASS-14): the item's status instead of what it needs.
-    need = openStatusText(it);
-    needStyle = {
-      fontSize: 12.5,
-      fontWeight: 700,
-      whiteSpace: "normal",
-      textAlign: "right",
-      color: it.submitted ? "var(--brand-text)" : it.missing ? "var(--red-fg)" : MUTED,
-    };
-  } else if (mine) {
-    need = "You typed";
-    pctText = `${trim(lock * 100)}%`;
-    needStyle = { fontSize: 12.5, fontWeight: 700, color: MUTED };
-  } else if (reachedAll) {
-    need = "Anything";
-    needStyle = { color: "var(--green-fg)" };
-  } else if (plan.kind === "impossible") {
-    need = it.placeholder ? "Full marks" : `${trim(it.points)} / ${trim(it.points)}`;
-    pctText = "100%";
-    needStyle = { color: MUTED };
-  } else if (plan.p !== null) {
-    const p = plan.p / 100;
-    if (it.placeholder) {
-      pctText = `${up1(plan.p).toFixed(1)}%`;
-      pctStyle = { fontSize: 14, fontWeight: 800, color: "var(--ink)" };
-    } else {
-      need = `${trim(halfUp(p * it.points))} / ${trim(it.points)}`;
-      pctText = `${up1(plan.p).toFixed(1)}%`;
-    }
-  } else {
-    need = "–";
-    needStyle = { color: MUTED };
+    return (
+      <div className="row-hover -mx-2 grid min-h-12 items-center gap-x-4 rounded-[10px] px-2 py-1.5" style={{ gridTemplateColumns: cols }}>
+        <div className="flex min-w-0 flex-col gap-px">
+          <span className="text-[13.5px] font-semibold leading-snug [overflow-wrap:anywhere]">{it.name.replaceAll("/", "/​")}</span>
+          {it.placeholder && (
+            <span className="text-[11.5px] leading-snug" style={{ color: MUTED }}>
+              Counts as one item worth {trim(group.weight)}%
+            </span>
+          )}
+        </div>
+        <span className="text-[12.5px] font-semibold leading-snug" style={{ color: it.dueAt ? SOFT : MUTED }}>
+          {it.placeholder ? "No date yet" : dueText(it.dueAt)}
+        </span>
+        {details && (
+          <span className="text-right text-[12.5px] font-semibold tabular-nums" style={{ color: MUTED }}>
+            {it.share.toFixed(1)}%
+          </span>
+        )}
+        <span
+          className="text-right text-[12.5px] font-bold leading-snug"
+          style={{ color: it.submitted ? "var(--brand-text)" : it.missing ? "var(--red-fg)" : MUTED }}
+        >
+          {openStatusText(it)}
+        </span>
+      </div>
+    );
   }
-  const tip = `${it.name}: ${it.placeholder ? "not posted yet" : `${trim(it.points)} points`}, worth ${it.share.toFixed(1)}% of your final grade`;
+
+  // Goal mode (CLASS-16): the box is empty and shows the suggestion in gray until you type a guess.
+  let hint = "–"; // the gray placeholder in the box
+  let marker = ""; // "Suggested" | "Your guess" | ...
+  let markerClass = "";
+  let markerColor = MUTED;
+  let sub = it.placeholder ? `worth ${trim(group.weight)}%` : `of ${pts} pts`;
+  if (mine) {
+    marker = "Your guess";
+    markerClass = "c-text";
+    markerColor = undefined;
+    if (!it.placeholder) sub = `${trim(lock * it.points)} / ${pts} pts`;
+  } else if (bad) {
+    marker = "Type 0 to 150";
+    markerColor = "var(--red-fg)";
+  } else if (reachedAll) {
+    hint = "0";
+    marker = "Anything works";
+    markerColor = "var(--green-fg)";
+  } else if (plan.kind === "impossible") {
+    hint = "100";
+    marker = "Full marks";
+    if (!it.placeholder) sub = `${pts} / ${pts} pts`;
+  } else if (plan.p !== null) {
+    hint = up1(plan.p).toFixed(1);
+    marker = "Suggested";
+    if (!it.placeholder) sub = `${trim(halfUp((plan.p / 100) * it.points))} / ${pts} pts`;
+  }
+  const tip = `${it.name}: ${it.placeholder ? "not posted yet" : `${pts} points`}, worth ${it.share.toFixed(1)}% of your final grade`;
   return (
     <div
       className={`${mine ? "c-tint" : "row-hover"} -mx-2 grid min-h-12 items-center gap-x-4 rounded-[10px] px-2 py-1.5`}
@@ -764,50 +740,88 @@ function ItemRow({ it, group, cols, plan, goalMode = true, reachedAll, fineTune,
     >
       <div className="flex min-w-0 flex-col gap-px">
         {/* Long names wrap (the row grows) instead of ending in "...". A slash is a place to break. */}
-        <span className="text-[13.5px] font-semibold leading-snug [overflow-wrap:anywhere]">{it.name.replaceAll("/", "/\u200B")}</span>
+        <span className="text-[13.5px] font-semibold leading-snug [overflow-wrap:anywhere]">{it.name.replaceAll("/", "/​")}</span>
         {it.placeholder && (
           <span className="text-[11.5px] leading-snug" style={{ color: MUTED }}>
-            {goalMode ? `Not posted yet, counts as one item worth ${trim(group.weight)}%` : `Counts as one item worth ${trim(group.weight)}%`}
+            Not posted yet, counts as one item worth {trim(group.weight)}%
           </span>
         )}
-        {goalMode && <OpenStatus it={it} />}
+        <OpenStatus it={it} />
       </div>
       <span className="text-[12.5px] font-semibold leading-snug" style={{ color: it.dueAt ? SOFT : MUTED }}>
-        {it.placeholder ? (goalMode ? "Not posted yet" : "No date yet") : dueText(it.dueAt)}
+        {it.placeholder ? "Not posted yet" : dueText(it.dueAt)}
       </span>
-      {fineTune && (
-        <span className="relative inline-flex">
-          <input
-            inputMode="decimal"
-            autoComplete="off"
-            aria-label={`Score you expect on ${it.name}, percent`}
-            placeholder="–"
-            value={typed}
-            onChange={(e) => onType(cleanNumber(e.target.value))}
-            className={`h-8 w-[76px] rounded-[9px] pl-2.5 pr-6 text-[13.5px] font-extrabold tabular-nums ${mine ? "calc-typed bg-[var(--surface)]" : "bg-[var(--field)]"}`}
-          />
-          <span className="pointer-events-none absolute left-[57px] top-2 text-xs font-bold" style={{ color: MUTED }}>
-            %
-          </span>
-        </span>
-      )}
       {details && (
         <span className="text-right text-[12.5px] font-semibold tabular-nums" style={{ color: MUTED }}>
           {it.share.toFixed(1)}%
         </span>
       )}
-      <div className="flex items-baseline justify-end gap-2 whitespace-nowrap">
-        {need && (
-          <span className="text-sm font-extrabold tabular-nums" style={needStyle}>
-            {need}
+      <div className="flex items-center justify-end gap-2.5">
+        <span className="flex min-w-0 flex-col items-end text-right leading-tight">
+          <span className={`whitespace-nowrap text-[11.5px] font-extrabold ${markerClass}`} style={markerColor ? { color: markerColor } : undefined}>
+            {marker}
           </span>
-        )}
-        {goalMode && (
-          <span className="w-[50px] text-right tabular-nums" style={pctStyle}>
-            {pctText}
+          <span className="whitespace-nowrap text-[11.5px] font-semibold tabular-nums" style={{ color: MUTED }}>
+            {sub}
           </span>
-        )}
+        </span>
+        <span className="relative inline-flex shrink-0">
+          <input
+            inputMode="decimal"
+            autoComplete="off"
+            aria-label={`Your guess for ${it.name}, percent${hint !== "–" && !mine ? ` (suggested ${hint}%)` : ""}`}
+            aria-invalid={bad || undefined}
+            placeholder={hint}
+            value={typed}
+            onChange={(e) => onType(cleanNumber(e.target.value))}
+            className={`h-8 w-[84px] rounded-[9px] pl-2.5 pr-[42px] text-[13.5px] font-extrabold tabular-nums placeholder:font-semibold ${mine ? "calc-typed bg-[var(--surface)]" : "bg-[var(--field)]"}`}
+          />
+          <span className="pointer-events-none absolute right-[28px] top-2 text-xs font-bold" style={{ color: MUTED }}>
+            %
+          </span>
+          {typed !== "" && (
+            <button
+              type="button"
+              onClick={() => onType("")}
+              aria-label={`Clear your guess for ${it.name}`}
+              title="Clear this guess"
+              className="calc-icon-btn absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-md"
+            >
+              <svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          )}
+        </span>
       </div>
+    </div>
+  );
+}
+
+// The meter under the result line (CLASS-16): the projected finish as a bar, the goal as a tick.
+function GoalMeter({ projected, goal, red }) {
+  if (projected === null || projected === undefined) return null;
+  const w = Math.max(0, Math.min(100, projected));
+  const g = Math.max(0, Math.min(100, goal));
+  return (
+    <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5" role="img" aria-label={`Projected finish ${pct1(projected)}, goal ${trim(goal)}%`}>
+      <span className="text-xs font-semibold" style={{ color: MUTED }}>
+        Projected finish
+      </span>
+      <span className="relative h-2.5 rounded-full bg-[var(--surface-2)]">
+        <span className="block h-full rounded-full transition-[width] duration-300" style={{ width: `${w}%`, background: red ? "var(--red-fg)" : "var(--c)" }} />
+        <span
+          className="absolute -top-[3px] h-4 w-[3px] -translate-x-1/2 rounded-full bg-[var(--ink)]"
+          style={{ left: `${g}%`, boxShadow: "0 0 0 1.5px var(--well)" }}
+          aria-hidden="true"
+        />
+      </span>
+      <span className="whitespace-nowrap text-[12.5px] tabular-nums" style={{ color: SOFT }}>
+        <b className="font-extrabold" style={{ color: "var(--ink)" }}>
+          {pct1(projected)}
+        </b>{" "}
+        · goal {trim(goal)}%
+      </span>
     </div>
   );
 }
@@ -935,20 +949,15 @@ function OpenStatus({ it }) {
   return null;
 }
 
-// Empty cells so a read-only row lines up with the "I expect" and "Share of final" columns.
-function Spacers({ fineTune, details }) {
-  return (
-    <>
-      {fineTune && <span />}
-      {details && <span />}
-    </>
-  );
+// An empty cell so a read-only row lines up with the "Share of final" column.
+function Spacers({ details }) {
+  return details ? <span /> : null;
 }
 
 const num = (n) => `${+Number(n).toFixed(2)}`;
 
 // A graded (or excused) assignment: read-only and dimmed, with the real score (CLASS-13).
-function GradedRow({ r, cols, fineTune, details }) {
+function GradedRow({ r, cols, details }) {
   return (
     <div
       className="row-hover -mx-2 grid min-h-9 items-center gap-x-4 rounded-[10px] px-2 py-1"
@@ -966,7 +975,7 @@ function GradedRow({ r, cols, fineTune, details }) {
         )}
         {r.excused ? "Excused" : "Graded"}
       </span>
-      <Spacers fineTune={fineTune} details={details} />
+      <Spacers details={details} />
       <div className="flex items-baseline justify-end gap-2 whitespace-nowrap">
         {r.excused ? (
           <span className="text-[12.5px] font-semibold" style={{ color: MUTED }}>
@@ -988,7 +997,7 @@ function GradedRow({ r, cols, fineTune, details }) {
 }
 
 // Open work in a category worth 0%: listed so nothing seems missing, but it needs nothing.
-function ZeroRow({ it, cols, fineTune, details }) {
+function ZeroRow({ it, cols, details }) {
   return (
     <div className="row-hover -mx-2 grid min-h-9 items-center gap-x-4 rounded-[10px] px-2 py-1" style={{ gridTemplateColumns: cols }}>
       <div className="flex min-w-0 flex-col gap-px">
@@ -1000,7 +1009,7 @@ function ZeroRow({ it, cols, fineTune, details }) {
       <span className="text-[12.5px] font-semibold leading-snug" style={{ color: MUTED }}>
         {dueText(it.dueAt)}
       </span>
-      <Spacers fineTune={fineTune} details={details} />
+      <Spacers details={details} />
       <span className="text-right text-[12.5px] font-semibold" style={{ color: MUTED }}>
         Doesn&apos;t count
       </span>

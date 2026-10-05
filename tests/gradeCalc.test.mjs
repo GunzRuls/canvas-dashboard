@@ -12,6 +12,8 @@ import {
   goalText,
   gradedRows,
   groupSummary,
+  guessLine,
+  guessOutcome,
   halfUp,
   leftOutNote,
   letterChoices,
@@ -320,4 +322,96 @@ test("open row status text", () => {
   assert.equal(openStatusText({ submitted: true, late: true }), "Submitted late · waiting for a grade");
   assert.equal(openStatusText({ missing: true }), "Marked missing in Canvas");
   assert.equal(openStatusText({}), "Not graded yet");
+});
+
+// CLASS-16: guesses typed into the list. Weighted fixture by hand:
+//   final = 20 + 25 × essay + 50 × exam (essay and exam as fractions; Homework is 80/100 graded of 200
+//   possible at 50%, the Exam placeholder is 100 points at 50%).
+test("guesses: nothing typed is the plain plan", () => {
+  const m = calcModel(weighted);
+  const o = guessOutcome(m, 80);
+  assert.equal(o.kind, "plan"); // 20 + 75p = 80 -> p = 80%
+  assert.equal(o.need, 80);
+  assert.equal(o.free, 2);
+  assert.equal(o.typed, 0);
+  assert.equal(o.projected, 80);
+  assert.equal(guessLine(o, 80, SCALE), "Score about 80% on each of the 2 things still to come.");
+});
+
+test("guesses: some typed, goal still reachable (placeholder category left open)", () => {
+  const m = calcModel(weighted);
+  const o = guessOutcome(m, 80, { essay: "60" }, 79);
+  assert.equal(o.kind, "withGuesses"); // 20 + 15 + 50x = 80 -> x = 90%
+  assert.equal(o.need, 90);
+  assert.equal(o.free, 1);
+  assert.equal(o.typed, 1);
+  assert.equal(o.pace, "doable");
+  assert.equal(o.projected, 80);
+  assert.equal(guessLine(o, 80, SCALE), "On track for 80% (B-) if you also average 90% on the one you haven't filled in.");
+  // A guess on the placeholder instead: 20 + 25e + 50 × 0.7 = 80 -> e = 100%.
+  const p = guessOutcome(m, 80, { "unposted-ex": "70" });
+  assert.equal(p.kind, "withGuesses");
+  assert.equal(p.need, 100);
+});
+
+test("guesses: typed scores make the goal impossible", () => {
+  const m = calcModel(weighted);
+  const o = guessOutcome(m, 80, { essay: "20" });
+  assert.equal(o.kind, "outWithGuesses"); // 20 + 5 + 50 = 75 at best
+  close(o.a1, 75, "best");
+  close(o.projected, 75, "projected");
+  assert.equal(guessLine(o, 80, SCALE), "Out of reach with these guesses: even 100% on the one left ends at 75.0%.");
+  // Without guesses but out of reach anyway: 95 is the most this class can give.
+  const n = guessOutcome(m, 96);
+  assert.equal(n.kind, "impossible");
+  assert.equal(guessLine(n, 96, SCALE), "Even 100% on everything left ends at 95.0%.");
+});
+
+test("guesses: everything typed finishes reached or short", () => {
+  const m = calcModel(weighted);
+  const ok = guessOutcome(m, 80, { essay: "90", "unposted-ex": "80" });
+  assert.equal(ok.kind, "allTyped"); // 20 + 22.5 + 40 = 82.5
+  close(ok.finish, 82.5, "finish");
+  assert.equal(ok.reached, true);
+  assert.equal(ok.free, 0);
+  assert.equal(guessLine(ok, 80, SCALE), "Your guesses finish at 82.5% (B-) — goal reached.");
+  const short = guessOutcome(m, 80, { essay: "60", "unposted-ex": "70" });
+  assert.equal(short.kind, "allTyped"); // 20 + 15 + 35 = 70
+  close(short.finish, 70, "finish");
+  close(short.short, 10, "short");
+  assert.equal(short.reached, false);
+  assert.equal(guessLine(short, 80, SCALE), "Your guesses finish at 70.0% (F) — 10.0% short of 80% (B-).");
+});
+
+test("guesses: locked in with or without guesses", () => {
+  const m = calcModel(weighted);
+  const o = guessOutcome(m, 20); // a 0 on both still ends at 20
+  assert.equal(o.kind, "locked");
+  close(o.projected, 20, "projected");
+  assert.equal(guessLine(o, 20, SCALE), "You've already locked in 20% (F).");
+  const g = guessOutcome(m, 45, { essay: "100" }); // 20 + 25 = 45 with a 0 on the exam
+  assert.equal(g.kind, "locked");
+});
+
+test("guesses: points class", () => {
+  // final = (85 + 50 × a3 + 50 × b1) / 200
+  const m = calcModel(points);
+  const none = guessOutcome(m, 80);
+  assert.equal(none.kind, "plan"); // 85 + 100p = 160 -> 75%
+  assert.equal(none.need, 75);
+  const some = guessOutcome(m, 80, { a3: "95" });
+  assert.equal(some.kind, "withGuesses"); // 85 + 47.5 + 50x = 160 -> 55%
+  assert.equal(some.need, 55);
+  assert.equal(guessLine(some, 80, []), "On track for 80% if you also average 55% on the one you haven't filled in.");
+  const all = guessOutcome(m, 80, { a3: "100", b1: "90" });
+  assert.equal(all.kind, "allTyped"); // 85 + 50 + 45 = 180 -> 90%
+  close(all.finish, 90, "finish");
+  assert.equal(guessLine(all, 80, []), "Your guesses finish at 90.0% — goal reached.");
+});
+
+test("guesses: nothing left to come", () => {
+  const done = { weighted: false, groups: [{ id: "a", name: "A", weight: 0, assignments: [graded("x", 9, 10)] }] };
+  const o = guessOutcome(calcModel(done), 80);
+  assert.equal(o.kind, "graded");
+  assert.equal(guessLine(o, 80, []), "Everything is graded. You finished at 90.0%.");
 });
